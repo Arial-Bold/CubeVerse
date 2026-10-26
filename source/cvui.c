@@ -35,10 +35,26 @@ void cv_background(float al) {
             }
         gfx_mesh(C, R, xy, col);
     }
-    /* very faint pinstripes, a hint of the Wii menu */
-    float lh = gfx_pixel_h();
-    Color line = rgba(255, 255, 255, (u8)(0.03f * 255 * al));
-    for (float y = fy; y < fy + fh; y += 4) gfx_rect(fx, gfx_snap_y(y), fw, lh, line);
+    /* pinstripes, a hint of the Wii menu: every 6 units, 2 thick */
+    Color line = rgba(255, 255, 255, (u8)(0.045f * 255 * al));
+    for (float y = fy; y < fy + fh; y += 6) gfx_rect(fx, gfx_snap_y(y), fw, 2, line);
+    /* a vignette: the edges fade to black */
+    {
+        enum { VC = 16, VR = 12 };
+        float vxy[(VC + 1) * (VR + 1) * 2];
+        Color vc[(VC + 1) * (VR + 1)];
+        for (int j = 0; j <= VR; j++)
+            for (int i = 0; i <= VC; i++) {
+                int k = j * (VC + 1) + i;
+                float u = (float)i / VC * 2 - 1, v = (float)j / VR * 2 - 1;
+                vxy[k * 2] = fx + fw * i / VC;
+                vxy[k * 2 + 1] = fy + fh * j / VR;
+                float d = sqrtf(u * u * 0.8f + v * v);   /* a little wider than tall */
+                float t = clamp01((d - 0.55f) / 0.75f);
+                vc[k] = rgba(0, 0, 0, (u8)(t * t * 0.85f * 255 * al));
+            }
+        gfx_mesh(VC, VR, vxy, vc);
+    }
 }
 
 void cv_title(const char *left, Color c, const char *right, float al) {
@@ -155,11 +171,11 @@ static float list_x, list_y, list_w, list_b;
 
 void cv_list_begin(float x, float y, float w, float bottom) {
     list_x = x; list_y = y; list_w = w; list_b = bottom;
-    gfx_set_clip(x - 12, y, w + 24, bottom - y);
+    gfx_set_base_clip(x - 12, y, w + 24, bottom - y);
 }
 
 void cv_list_end(bool more_below, float al) {
-    gfx_clear_clip();
+    gfx_clear_base_clip();
     if (!more_below || al <= 0) return;
     /* fade the last part into the background, then the light line */
     float fx, fy, fw, fh;

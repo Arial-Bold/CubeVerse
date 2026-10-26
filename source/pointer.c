@@ -6,7 +6,10 @@
 #include "gfx.h"
 #include "ui.h"
 #include "m3d.h"
+#include "textures.h"
+#include <malloc.h>
 #include <math.h>
+#include <string.h>
 
 #define NHOT 160
 
@@ -19,7 +22,9 @@ static int over = -1, last_over = -1;
 static bool shown = true;
 static float cx0, cy0, cw, ch;  /* confinement */
 static float speed;
-static int style, pen_r;   /* 0 the hand, 1 the drawing pen (a ring the pen's size) */
+static int style, pen_r;
+static GfxImage hand;
+static bool hand_ready, hand_ok;   /* 0 the hand, 1 the drawing pen (a ring the pen's size) */
 
 void ptr_pen(float radius) { style = 1; pen_r = (int)(radius * 100); }
 
@@ -92,7 +97,7 @@ void ptr_update(void) {
     /* what's under the hand, from the last frame's areas */
     int prev = over;
     over = hit(hots[cur], nhot[cur], px, py);
-    if (over >= 0 && over != prev && over != last_over) sound_play(SFX_HOVER);
+    (void)prev;
     if (over >= 0) last_over = over;
     if (over < 0) last_over = -1;
 }
@@ -130,30 +135,6 @@ float ptr_scroll(float top, float bottom) {
 
 /* ------------------------------------------------------------- drawing */
 
-/* The hand in a 26 x 32 box, tip at (9.5, 1). */
-static void hand_shapes(float ox, float oy, float s, bool outline, Color fill_top, Color fill_bot, float al) {
-    float grow = outline ? 1.2f : 0;
-    Color o = rgba(0x24, 0x1C, 0x5C, (u8)(255 * al));
-#define R_(x, y, w, h, r)                                                                                         \
-    do {                                                                                                          \
-        float X = ox + ((x) - grow) * s, Y = oy + ((y) - grow) * s, Wd = ((w) + 2 * grow) * s, Ht = ((h) + 2 * grow) * s; \
-        if (outline) gfx_rrect(X, Y, Wd, Ht, ((r) + grow) * s, o);                                                 \
-        else gfx_rrect_vgrad(X, Y, Wd, Ht, (r) * s,                                                               \
-                             color_lerp(fill_top, fill_bot, clamp01(((y) - 1) / 30.0f)),                          \
-                             color_lerp(fill_top, fill_bot, clamp01(((y) + (h) - 1) / 30.0f)));                  \
-    } while (0)
-    R_(7, 1, 5, 18, 2.5f);          /* the pointing finger */
-    R_(11.8f, 8.6f, 4.7f, 10, 2.35f);
-    R_(16.2f, 10.2f, 4.4f, 9, 2.2f);
-    R_(20.2f, 12.4f, 3.8f, 8, 1.9f);
-    R_(6.8f, 14.5f, 17.2f, 14.9f, 4.0f);   /* the palm */
-    /* the thumb, turned 42 degrees about (8,18) */
-    gfx_set_spin(ox + 8 * s, oy + 18 * s, 1, 42, 0, 0);
-    R_(1.2f, 15.6f, 10, 4.8f, 2.4f);
-    gfx_reset_transform();
-#undef R_
-}
-
 void ptr_draw(float al) {
     if (!shown || al <= 0) return;
     if (style == 1) {
@@ -168,24 +149,21 @@ void ptr_draw(float al) {
         gfx_rect(px + r + 2, py - 0.8f, 5, 1.6f, blue);
         return;
     }
-    float s = 0.95f;
-    float ox = px - 9.5f * s, oy = py - 1 * s;
-    /* soft shadow */
-    Color sh = rgba(0, 0, 0, (u8)(0.45f * 255 * al));
-    gfx_rrect(ox + 8 * s + 2, oy + 2 + 3, 5 * s, 18 * s, 2.5f * s, sh);
-    gfx_rrect(ox + 6.8f * s + 2, oy + 14.5f * s + 3, 17.2f * s, 14.9f * s, 4 * s, sh);
-    /* faint blue glow, then outline, then the pearl fill */
-    gfx_rrect(ox + 4 * s, oy - 1, 22 * s, 32 * s, 8 * s, rgba(175, 195, 255, (u8)(0.10f * 255 * al)));
-    hand_shapes(ox, oy, s, true, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0), al);
-    hand_shapes(ox, oy, s, false, rgba(0xFF, 0xFF, 0xFF, (u8)(255 * al)), rgba(0xB4, 0xBA, 0xD6, (u8)(255 * al)), al);
-    /* creases between the fingers, and the thumb's */
-    Color cr = rgba(0x24, 0x1C, 0x5C, (u8)(0.75f * 255 * al));
-    gfx_line(ox + 12 * s, oy + 11.4f * s, ox + 12 * s, oy + 15.6f * s, 0.9f * s, cr);
-    gfx_line(ox + 16.35f * s, oy + 13 * s, ox + 16.35f * s, oy + 16.4f * s, 0.9f * s, cr);
-    gfx_line(ox + 20.35f * s, oy + 15 * s, ox + 20.35f * s, oy + 17.8f * s, 0.9f * s, cr);
-    gfx_line(ox + 9.4f * s, oy + 20.6f * s, ox + 10.4f * s, oy + 22.8f * s, 0.9f * s, cr);
-    /* gloss */
-    gfx_rrect(ox + 8.1f * s, oy + 2.6f * s, 1.3f * s, 11 * s, 0.65f * s, rgba(255, 255, 255, (u8)(255 * al)));
-    gfx_rrect(ox + 12.9f * s, oy + 10 * s, 1 * s, 4 * s, 0.5f * s, rgba(255, 255, 255, (u8)(0.8f * 255 * al)));
-    gfx_rrect(ox + 17.2f * s, oy + 11.6f * s, 0.9f * s, 3.4f * s, 0.45f * s, rgba(255, 255, 255, (u8)(0.8f * 255 * al)));
+    /* the hand (textures.h), drawn at half its texture size so its edges stay smooth */
+    if (!hand_ready) {
+        hand_ready = true;
+        void *d = memalign(32, sizeof(HAND_TEX));
+        if (d) {
+            memcpy(d, HAND_TEX, sizeof(HAND_TEX));
+            hand_ok = gfx_image_init(&hand, d, HAND_W, HAND_H, HAND_TW, HAND_TH, GFX_RGB5A3);
+        }
+    }
+    float k = 0.46f;
+    float x = px - HAND_TIP_X * k, y = py - HAND_TIP_Y * k;
+    if (hand_ok) {
+        gfx_image_draw(&hand, x + 2, y + 3, HAND_W * k, HAND_H * k, rgba(0, 0, 0, (u8)(90 * al)));   /* shadow */
+        gfx_image_draw(&hand, x, y, HAND_W * k, HAND_H * k, rgba(255, 255, 255, (u8)(255 * al)));
+    } else {
+        gfx_circle(px, py, 4, rgba(255, 255, 255, (u8)(255 * al)));
+    }
 }

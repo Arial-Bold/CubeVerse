@@ -220,6 +220,7 @@ static void load_matrix(void) {
 
 void gfx_begin_frame(void) {
     Mtx44 proj;
+    gfx_clear_base_clip();
     /* the design area (0..vw, 0..480) is shrunk into the middle of the
      * screen by the margin; backgrounds draw past it (gfx_full_area) */
     float mx = vw * margin, my = 480.0f * margin;
@@ -336,26 +337,61 @@ void gfx_end_3d(void) {
     load_matrix();
 }
 
-void gfx_set_clip(float x, float y, float w, float h) {
-    if (!isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h)) { gfx_clear_clip(); return; }
+/* The base clip (a scrolling list): every other clip stays inside it, and
+ * gfx_clear_clip goes back to it rather than to the whole screen. */
+static int base_x, base_y, base_w = -1, base_h = -1;
+
+static void clip_rect(float x, float y, float w, float h, int *opx, int *opy, int *opw, int *oph) {
     float x0 = x * t_a + t_tx, y0 = y * t_d + t_ty;
     float x1 = (x + w) * t_a + t_tx, y1 = (y + h) * t_d + t_ty;
     float mx = vw * margin, my = 480.0f * margin;
     float kx = rmode->fbWidth / (vw + 2 * mx), ky = rmode->efbHeight / (480.0f + 2 * my);
     int px = (int)floorf((x0 + mx) * kx), py = (int)floorf((y0 + my) * ky);
     int pw = (int)ceilf((x1 + mx) * kx) - px, ph = (int)ceilf((y1 + my) * ky) - py;
-    if (px < 0) { pw += px; px = 0; }
-    if (py < 0) { ph += py; py = 0; }
-    if (px > rmode->fbWidth - 1) px = rmode->fbWidth - 1;
-    if (py > rmode->efbHeight - 1) py = rmode->efbHeight - 1;
-    if (px + pw > rmode->fbWidth) pw = rmode->fbWidth - px;
-    if (py + ph > rmode->efbHeight) ph = rmode->efbHeight - py;
-    if (pw < 1) pw = 1;
-    if (ph < 1) ph = 1;
-    GX_SetScissor(px, py, pw, ph);
+    *opx = px; *opy = py; *opw = pw; *oph = ph;
 }
 
-void gfx_clear_clip(void) { GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight); }
+static void apply_scissor(int px, int py, int pw, int ph) {
+    int bx = 0, by = 0, bw = rmode->fbWidth, bh = rmode->efbHeight;
+    if (base_w >= 0) { bx = base_x; by = base_y; bw = base_w; bh = base_h; }
+    int x0 = px > bx ? px : bx, y0 = py > by ? py : by;
+    int x1 = px + pw < bx + bw ? px + pw : bx + bw, y1 = py + ph < by + bh ? py + ph : by + bh;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > rmode->fbWidth) x1 = rmode->fbWidth;
+    if (y1 > rmode->efbHeight) y1 = rmode->efbHeight;
+    if (x0 > rmode->fbWidth - 1) x0 = rmode->fbWidth - 1;
+    if (y0 > rmode->efbHeight - 1) y0 = rmode->efbHeight - 1;
+    int w = x1 - x0, h = y1 - y0;
+    if (w < 1) w = 1;
+    if (h < 1) h = 1;
+    GX_SetScissor(x0, y0, w, h);
+}
+
+void gfx_set_base_clip(float x, float y, float w, float h) {
+    if (!isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h)) return;
+    base_w = -1;
+    clip_rect(x, y, w, h, &base_x, &base_y, &base_w, &base_h);
+    if (base_w < 0) base_w = 0;
+    apply_scissor(base_x, base_y, base_w, base_h);
+}
+
+void gfx_clear_base_clip(void) {
+    base_w = base_h = -1;
+    GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
+}
+
+void gfx_set_clip(float x, float y, float w, float h) {
+    if (!isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h)) { gfx_clear_clip(); return; }
+    int px, py, pw, ph;
+    clip_rect(x, y, w, h, &px, &py, &pw, &ph);
+    apply_scissor(px, py, pw, ph);
+}
+
+void gfx_clear_clip(void) {
+    if (base_w >= 0) apply_scissor(base_x, base_y, base_w, base_h);
+    else GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
+}
 
 /* ------------------------------------------------------------------ state */
 

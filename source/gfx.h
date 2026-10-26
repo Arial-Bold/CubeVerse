@@ -68,6 +68,10 @@ void gfx_end_3d(void);
 
 void gfx_set_clip(float x, float y, float w, float h);
 void gfx_clear_clip(void);
+/* A clip every other clip stays inside (a scrolling list); gfx_clear_clip
+ * returns to it. */
+void gfx_set_base_clip(float x, float y, float w, float h);
+void gfx_clear_base_clip(void);
 
 void gfx_rect(float x, float y, float w, float h, Color c);
 void gfx_rect_vgrad(float x, float y, float w, float h, Color top, Color bottom);

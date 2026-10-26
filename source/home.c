@@ -32,6 +32,8 @@ static const float WOB_PERIOD[4] = { 4.4f, 4.9f, 4.0f, 4.6f }, WOB_OFF[4] = { 0,
 
 static float ring;        /* where the ring has turned to (cube at the front, fractional while turning) */
 static int target;        /* the cube being turned to */
+static float turn_t = -1, turn_from;   /* time into the current turn (-1: not turning) */
+#define TURN_S 0.95f
 static float exit_armed_until;
 static float shown_t;     /* seconds on this screen */
 static bool from_splash;
@@ -70,6 +72,7 @@ static void home_enter(const char *arg, bool back) {
     (void)back;
     from_splash = arg && !strcmp(arg, "splash");
     ring = target = g_home_section;
+    turn_t = -1;
     shown_t = 0;
     menumusic_start(from_splash ? 0.5f : 0.2f);
     if (from_splash && g_set.update_auto && update_state() == UPD_NONE) update_request_check(true);
@@ -98,18 +101,27 @@ static void home_update(void) {
         snprintf(m, sizeof(m), "CubeVerse %s is available. Press Z to see what's new.", update_latest_version());
         app_toast(m);
     }
-    /* turning */
-    float diff = target - ring;
-    bool settled = fabsf(diff) < 0.02f;
-    int d = input_stick_dir();
-    if (d < 0) d = input_dir();
-    if (fabsf(diff) < 0.35f) {
-        if (d == DIR_RIGHT) { target++; sound_play(SFX_TURN_SIDE); }
-        else if (d == DIR_LEFT) { target--; sound_play(SFX_TURN_SIDE); }
+    /* turning: one cube at a time, taking as long as Flashcube's cube takes to
+     * turn to a side (0.95 s, the same easing); a new turn only starts once
+     * the last one has finished */
+    if (turn_t >= 0) {
+        turn_t += g_dt;
+        float k = ease_bezier(clamp01(turn_t / TURN_S), 0.55f, 0, 0.3f, 1);
+        ring = turn_from + (target - turn_from) * k;
+        if (turn_t >= TURN_S) { ring = (float)target; turn_t = -1; }
     }
-    float k = clamp01(g_dt * 7.5f);
-    ring += (target - ring) * k;
-    if (fabsf(target - ring) < 0.002f) ring = (float)target;
+    bool settled = turn_t < 0;
+    if (settled) {
+        int d = input_stick_dir();
+        if (d < 0) d = input_dir();
+        if (d == DIR_RIGHT || d == DIR_LEFT) {
+            turn_from = ring;
+            target += d == DIR_RIGHT ? 1 : -1;
+            turn_t = 0;
+            sound_play(SFX_TURN_SIDE);
+            return;
+        }
+    }
     if (!settled) return;
     if (input_pressed(BTN_A)) open_section(front_cube());
     else if (input_pressed(BTN_START)) { sound_play(SFX_SELECT); settings_panel_open(); }
