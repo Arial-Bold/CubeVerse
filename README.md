@@ -9,21 +9,24 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 ## Features
 
 ### The opening and the home cubes
-- Solid blocks fly in and build the CubeVerse logo in 3D. The three logo cubes then glide into place and turn into the home screen's glass cubes.
+- Solid blocks fly in and build the CubeVerse logo in 3D, to the sound of a happy crowd getting busier and busier, a hush, and a "boing" as the logo comes together. The three logo cubes then glide into place and turn into the home screen's glass cubes.
 - Four glass cubes on a ring: **Activity**, **Communities**, **Notifications** and **My page**. Turn the ring with the Control Stick. Each cube drifts to its own rhythm, with a block icon floating inside.
-- Flashcube's menu sounds and its slow, airy background music.
+- A soft old-TV look: gentle scanlines, a slight curve and dark edges.
+- Menu sounds and CubeVerse's own mellow background music, made by the GameCube as it plays.
 
 ### Moving around
-- A hand pointer, moved with the Control Stick like a mouse. A clicks, the D-pad hops between things and the C-stick scrolls.
+- A pointer, moved with the Control Stick like a mouse (its speed is in Settings). A clicks, the D-pad hops between things and the C-stick scrolls.
 - Lists run off the bottom of the screen into a fading line of light, and more posts load as you scroll.
 
 ### Reading
 - **Activity:** your feed, posts from people you follow, or everyone (My Feed, People, Global).
-- **Communities:** popular and new communities, or all of them, as tiles with their icons.
+- **Communities:** popular and new communities, or all of them, each with its icon, name and followers.
 - **A community:** its newest or most popular posts, Follow, and Post here.
 - **A post:** the post, big, with its comments.
 - **Notifications:** Yeahs, comments and new followers. The number of new ones shows on the home screen.
 - **My page** and anyone's page: their Mii, bio, followers, and their posts or Yeahs.
+- **Japanese** posts show in Japanese (kana and about 6,300 kanji).
+- Pictures (Mii faces, icons, drawings, screenshots) are kept on the SD card (`cubeverse/cache`, up to 48 MB), so pages you've seen before load quickly.
 
 ### Joining in
 - **Yeah!** any post with X or its button.
@@ -38,7 +41,7 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 
 ### Settings (START on the home screen)
 - 4:3 or 16:9, standard (640) or full (704) width, screen margin, video mode.
-- Opening animation, menu sounds and music, volumes.
+- Opening animation, pointer speed, menu sounds and music, volumes.
 - Your Pretendo account (sign out), software updates, and what Exit does.
 
 ## Controls
@@ -72,3 +75,5 @@ The `pc` folder has a test build that runs CubeVerse on a PC against a stand-in 
 ## Thanks
 
 To the Pretendo Network and Juxtaposition teams. CubeVerse isn't affiliated with Nintendo.
+
+Japanese text uses M PLUS 1p and Noto Sans CJK JP (SIL Open Font License). Every sound and the music are CubeVerse's own, made from scratch.
