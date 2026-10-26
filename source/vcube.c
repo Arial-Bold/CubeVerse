@@ -492,26 +492,6 @@ M34 vcube_matrix(const VCube *c) {
                    m34_mul(m34_rx(c->ax), m34_mul(m34_ry(c->ay), m34_rz(c->az)))));
 }
 
-void vcube_bounds(const VCube *v, float *x0, float *y0, float *x1, float *y1) {
-    M34 C = vcube_matrix(v);
-    *x0 = *y0 = 1e9f; *x1 = *y1 = -1e9f;
-    for (int k = 0; k < 8; k++) {
-        float x = (k & 1) ? HALF : -HALF, y = (k & 2) ? HALF : -HALF, z = (k & 4) ? HALF : -HALF;
-        float X = C.m[0] * x + C.m[1] * y + C.m[2] * z + C.m[3];
-        float Y = C.m[4] * x + C.m[5] * y + C.m[6] * z + C.m[7];
-        float Z = C.m[8] * x + C.m[9] * y + C.m[10] * z + C.m[11];
-        float d = VC_PERSP - Z;
-        if (d < 1) d = 1;
-        float kk = VC_PERSP / d, sx = v->cx + X * kk, sy = v->cy + Y * kk;
-        if (sx < *x0) *x0 = sx;
-        if (sx > *x1) *x1 = sx;
-        if (sy < *y0) *y0 = sy;
-        if (sy > *y1) *y1 = sy;
-    }
-    /* the soft glow round the edges */
-    *x0 -= 14; *y0 -= 14; *x1 += 14; *y1 += 14;
-}
-
 static void set_tint(Color t) {
     if (glass_ready && glass_tint.r == t.r && glass_tint.g == t.g && glass_tint.b == t.b) return;
     tint_r = t.r; tint_g = t.g; tint_b = t.b;
