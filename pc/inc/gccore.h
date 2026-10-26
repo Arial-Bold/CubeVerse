@@ -42,7 +42,8 @@ enum { GX_PASSCLR = 100, GX_MODULATE = 101 };
 enum { GX_TEVSTAGE1 = 201, GX_TEVSTAGE2, GX_TEVSTAGE3, GX_TEVSTAGE4, GX_TEXCOORD1 = 211, GX_TEXCOORD2, GX_TEXCOORD3,
        GX_CC_TEXC = 221, GX_CC_CPREV, GX_CC_KONST, GX_TEV_KCSEL_1_4 = 231, GX_MTX2x4 = 0 };
 enum { GX_TEXMTX0 = 30, GX_TEXMTX1 = 33, GX_TEXMTX2 = 36, GX_TEXMTX3 = 39 };
-void GX_SetTevKColorSel(u8 stage, u8 sel); void GX_LoadTexMtxImm(float m[3][4], u32 id, u8 type);
+void GX_SetTevKColorSel(u8 stage, u8 sel); void GX_SetTevKAlphaSel(u8 stage, u8 sel);
+enum { GX_TEV_KASEL_1_4 = 240, GX_CA_KONST = 241, GX_CA_APREV = 242 }; void GX_LoadTexMtxImm(float m[3][4], u32 id, u8 type);
 enum { GX_CC_ZERO, GX_CC_RASC, GX_CA_ZERO, GX_CA_TEXA, GX_CA_RASA, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TEVPREV };
 enum { GX_TF_I4 = 0, GX_TF_I8 = 1, GX_TF_RGB565 = 4, GX_TF_RGB5A3 = 5 };
 enum { GX_CLAMP = 0, GX_REPEAT = 1 };

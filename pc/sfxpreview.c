@@ -22,14 +22,13 @@ int main(int argc, char **argv) {
         fclose(f);
         free(b);
     }
-    /* the menu music: the piece repeats every two times round (the second
-     * time has small changes), so passes 1 and 2 loop seamlessly; pass 0,
-     * with its gentle start, plays only once and is skipped here */
-    double pass_frames = 256 * (60.0 / 70.0 / 2.0) * MS_RATE;
-    int skip = (int)(pass_frames + 0.5), n = (int)(pass_frames * 3 + 0.5) - skip;
+    /* the menu music: the intro plays once, then the loop (two times round
+     * the repeating part, which loops seamlessly) */
+    int skip = (int)(MS_INTRO_SECONDS * MS_RATE + 0.5), n = (int)(MS_LOOP_SECONDS * MS_RATE + 0.5);
+    if (argc > 2) { skip = 0; n += (int)(MS_INTRO_SECONDS * MS_RATE + 0.5); }   /* "full": from the very start */
     int16_t *b = malloc(sizeof(int16_t) * 2 * (size_t)(skip > n ? skip : n));
     ms_reset();
-    for (int at = 0; at < skip; at += 512) ms_render(b, skip - at < 512 ? skip - at : 512, 1.0f);
+    for (int at = 0; at < skip; at += 512) ms_render(b, skip - at < 512 ? skip - at : 512, 1.0f);   /* (nothing if skip is 0) */
     for (int at = 0; at < n; at += 512) ms_render(b + at * 2, n - at < 512 ? n - at : 512, 1.0f);
     char p[256];
     snprintf(p, sizeof(p), "%s/menu_music_loop.wav", dir);

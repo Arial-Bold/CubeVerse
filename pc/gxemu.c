@@ -57,6 +57,7 @@ static float texoff[4][2];   /* the four looks of a smoothed picture (texture ma
 static int gen_mtx[4];
 void GX_SetNumTexGens(u32 n) { ntexgens = (int)n; if (!n) tev = 0; if (n == 4) tev = 3; }
 void GX_SetTevKColorSel(u8 st, u8 sel) { (void)st; (void)sel; }
+void GX_SetTevKAlphaSel(u8 st, u8 sel) { (void)st; (void)sel; }
 void GX_LoadTexMtxImm(float m[3][4], u32 id, u8 type) {
     (void)type; int k = ((int)id - GX_TEXMTX0) / 3; if (k >= 0 && k < 4) { texoff[k][0] = m[0][3]; texoff[k][1] = m[1][3]; } }
 void GX_SetTevOrder(u8 s, u8 c, u32 m, u8 col) { (void)s; (void)c; (void)m; (void)col; }
