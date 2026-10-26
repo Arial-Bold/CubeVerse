@@ -1,0 +1,30 @@
+name: Build CubeVerse (libogc2)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the source code
+        uses: actions/checkout@v5
+
+      - name: Download stb_image and mbedTLS
+        run: sh get-deps.sh
+
+      - name: Build the .dol
+        run: docker run --rm -v "$PWD:/src" -w /src ghcr.io/extremscorner/libogc2:latest make
+
+      - name: Gather files for the SD card
+        run: |
+          mkdir -p package/cubeverse
+          cp cubeverse.dol package/
+          cp sd/cubeverse/README.txt sd/cubeverse/cacert.pem package/cubeverse/
+
+      - name: Upload result
+        uses: actions/upload-artifact@v6
+        with:
+          name: cubeverse
+          path: package/
