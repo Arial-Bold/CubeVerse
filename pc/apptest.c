@@ -4,6 +4,7 @@
 #include "input.h"
 #include "pointer.h"
 #include "juxt.h"
+#include "cvui.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +44,26 @@ int main(int argc, char **argv) {
         }
         return 0;
     }
+    if (!strcmp(script, "bg")) {
+        /* the background options, on the home screen and a list */
+        run(60 * 12);
+        JResult r = { 0 };
+        juxt_sign_in(&r, "kirbyfan", "secret");
+        for (int i = 0; i < 300 && r.state != JS_READY && r.state != JS_FAILED; i++) run(1);
+        for (int st = 0; st <= 4; st++) {
+            cv_set_bg_style(st);
+            char n[32];
+            run(40); snprintf(n, sizeof(n), "bg%d_home", st); shot(n);
+        }
+        hold(0, 1, 0, 6); run(70); hold(0, 1, 0, 6); run(70); hold(0, 1, 0, 6); run(70);   /* to My page */
+        press(BTN_A); run(150);
+        for (int st = 0; st <= 4; st++) {
+            cv_set_bg_style(st);
+            char n[32];
+            run(20); snprintf(n, sizeof(n), "bg%d_mypage", st); shot(n);
+        }
+        return 0;
+    }
     run(60 * 12);                 /* the opening */
     shot("01_home");
     if (!strcmp(script, "tour")) {
@@ -58,7 +79,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < 40; i++) { input_test_state(0, 0, 0, 0, 0); run(1); }
         press(BTN_R); wait_loaded(90); shot("05_activity_people");
         press(BTN_B); run(60);
-        hold(0, 1, 0, 6); run(50); shot("06_home_communities");
+        hold(0, 1, 0, 6); run(70); shot("06_home_communities");
         press(BTN_A); wait_loaded(120); shot("07_communities");
         click(140, 160); wait_loaded(120); shot("08_community");
         click(170, 230); wait_loaded(120); shot("09_post");
@@ -78,11 +99,13 @@ int main(int argc, char **argv) {
         shot("14_draw_scribble");
         press(BTN_START); run(90); shot("15_after_post");
         press(BTN_B); run(40); press(BTN_B); run(40); press(BTN_B); run(80);
-        hold(0, 1, 0, 6); run(50);
+        hold(0, 1, 0, 6); run(70);
         press(BTN_A); wait_loaded(90); shot("16_notifications");
         press(BTN_B); run(60);
-        hold(0, 1, 0, 6); run(50);
+        hold(0, 1, 0, 6); run(70);
         press(BTN_A); wait_loaded(90); shot("17_my_page");
+        hold(0, 0, 1, 150); shot("17b_my_page_scrolled");
+        press(BTN_B); run(60); press(BTN_A); wait_loaded(90);
         click(120, 210); wait_loaded(90); shot("18_post_from_profile");
         press(BTN_B); run(40); press(BTN_B); run(80);
         press(BTN_START); run(30); shot("19_settings");
