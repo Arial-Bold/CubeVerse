@@ -27,6 +27,6 @@ bool  ptr_shown(void);
 bool  ptr_held(void);
 /* Keeps the hand inside a box (drawing); w = 0 to free it. */
 void  ptr_confine(float x, float y, float w, float h);
-/* Scrolling a list with the C-stick, or by pushing the hand against the
- * top or bottom of the area: how far to scroll this frame. */
+/* Scrolling a list with the C-stick: how far to scroll this frame. (The
+ * area is no longer used; the pointer never scrolls the list.) */
 float ptr_scroll(float top, float bottom);

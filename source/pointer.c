@@ -122,13 +122,8 @@ int ptr_clicked(void) {
 }
 
 float ptr_scroll(float top, float bottom) {
-    float d = input_cstick_y() * 600 * g_dt;
-    if (shown && cw <= 0) {
-        float edge = 26;
-        if (py > bottom - edge && input_stick_y() > 0.3f) d += (py - (bottom - edge)) / edge * 420 * g_dt;
-        if (py < top + edge && input_stick_y() < -0.3f) d -= ((top + edge) - py) / edge * 420 * g_dt;
-    }
-    return d;
+    (void)top; (void)bottom;
+    return input_cstick_y() * 600 * g_dt;   /* only the C-stick scrolls (not the pointer at the edges) */
 }
 
 /* ------------------------------------------------------------- drawing */
