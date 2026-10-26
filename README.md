@@ -33,7 +33,7 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 
 ### Signing in
 - Type your Pretendo Network ID and password with the on-screen keyboard, or scan the QR code with a phone on the same network and sign in there.
-- Only the sign-in key Juxt gives back is kept on the SD card, never your password. Sign out in Settings.
+- CubeVerse remembers your ID and password on the SD card (scrambled, in `cubeverse/account.ini`) so it can sign you in again by itself when Juxt's session runs out. Sign out in Settings to forget them.
 - Juxt only lets accounts that have opened Juxt once on a Wii U or 3DS use it, so a brand-new account needs that first.
 
 ### Settings (START on the home screen)
