@@ -8,16 +8,6 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 
 ## Features
 
-### The opening and the home cubes
-- Solid blocks fly in and build the CubeVerse logo in 3D, to the sound of a happy crowd getting busier and busier, a hush, and a "boing" as the logo comes together. The three logo cubes then glide into place and turn into the home screen's glass cubes.
-- Four glass cubes on a ring: **Activity**, **Communities**, **Notifications** and **My page**. Turn the ring with the Control Stick. Each cube drifts to its own rhythm, with a block icon floating inside.
-- A soft old-TV look: gentle scanlines, a slight curve and dark edges.
-- Menu sounds and CubeVerse's own mellow background music, made by the GameCube as it plays.
-
-### Moving around
-- A pointer, moved with the Control Stick like a mouse (its speed is in Settings). A clicks, the D-pad hops between things and the C-stick scrolls.
-- Lists run off the bottom of the screen into a fading line of light, and more posts load as you scroll.
-
 ### Reading
 - **Activity:** your feed, posts from people you follow, or everyone (My Feed, People, Global).
 - **Communities:** popular and new communities, or all of them, each with its icon, name and followers.
