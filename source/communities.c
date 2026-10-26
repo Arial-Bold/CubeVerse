@@ -1,5 +1,6 @@
-/* communities.c - the communities: Popular & new, or every community, as
- * tiles with the community's icon on a colour band. */
+/* communities.c - the communities: Popular & new, or every community, in
+ * two columns of rows: the community's square icon on the left, its name
+ * and followers beside it, dashed lines between the rows. */
 #include "app.h"
 #include "cvui.h"
 #include "pointer.h"
@@ -20,16 +21,9 @@ static float item_top[JPAGE_COMMUNITIES], item_bot[JPAGE_COMMUNITIES];
 
 #define ID_TAB 10
 #define ID_TILE 1000
-#define TILE_H 112.0f
-#define GAP 14.0f
-
-/* soft colour bands, picked from the name */
-static const Color BANDS[][2] = {
-    { { 0x7D, 0xC8, 0xF5, 255 }, { 0x3A, 0x7F, 0xD6, 255 } }, { { 0xB9, 0xA2, 0xFF, 255 }, { 0x6F, 0x4F, 0xD6, 255 } },
-    { { 0xFF, 0xB3, 0x7A, 255 }, { 0xE8, 0x6A, 0x3A, 255 } }, { { 0x8F, 0xDD, 0xB6, 255 }, { 0x2F, 0xA6, 0x78, 255 } },
-    { { 0xF5, 0x9A, 0xC0, 255 }, { 0xC9, 0x4C, 0x86, 255 } }, { { 0x9F, 0xD8, 0xFF, 255 }, { 0x29, 0xA8, 0xE0, 255 } },
-    { { 0xFF, 0xD3, 0x6E, 255 }, { 0xE0, 0xA2, 0x1E, 255 } }, { { 0x8F, 0xE0, 0xE0, 255 }, { 0x2A, 0xA6, 0xA6, 255 } },
-};
+#define ROW_H 76.0f       /* one community */
+#define COL_GAP 22.0f
+#define HEAD_H 34.0f      /* a section's heading bar */
 
 static void load(void) {
     juxt_load(&page, tab ? JP_COMMUNITIES_ALL : JP_COMMUNITIES, "");
@@ -44,7 +38,7 @@ static void enter(const char *arg, bool back) {
     }
 }
 
-static int cols(void) { return UI_W > 700 ? 4 : 3; }
+static int cols(void) { return 2; }
 
 static void set_tab(int t) {
     t = (t + 2) % 2;
@@ -84,24 +78,40 @@ static void update(void) {
     scroll += (target - scroll) * clamp01(g_dt * 12);
 }
 
-static void tile(const JCommunity *cm, float x, float y, float w, bool hot, float al) {
-    unsigned hsh = 0;
-    for (const char *p = cm->name; *p; p++) hsh = hsh * 31 + (unsigned char)*p;
-    const Color *band = BANDS[hsh % (sizeof(BANDS) / sizeof(BANDS[0]))];
-    cv_card(x, y, w, TILE_H, false, al);
-    float bh = 62;
-    float xy[8] = { x, y, x + w, y, x + w, y + bh, x, y + bh };
-    Color c4[4] = { color_alpha(band[0], al), color_alpha(color_lerp(band[0], band[1], 0.5f), al), color_alpha(band[1], al),
-                    color_alpha(color_lerp(band[0], band[1], 0.5f), al) };
-    gfx_quad_colors(xy, c4);
-    float is = 46;
-    if (cm->icon[0]) {
-        gfx_rect(x + w / 2 - is / 2 - 2, y + bh / 2 - is / 2 - 2, is + 4, is + 4, rgba(255, 255, 255, (u8)(200 * al)));
-        img_draw_cover(cm->icon, IMG_SMALL, x + w / 2 - is / 2, y + bh / 2 - is / 2, is, is, al);
+/* a row: the icon framed on the left, the name and followers beside it */
+static void row(const JCommunity *cm, float x, float y, float w, bool hot, float al) {
+    float is = ROW_H - 18, ix = x + 4, iy = y + 9;
+    gfx_rect(ix + 2, iy + 3, is, is, rgba(0, 0, 0, (u8)(110 * al)));                  /* shadow */
+    gfx_rect(ix - 2, iy - 2, is + 4, is + 4, rgba(0xdf, 0xe4, 0xee, (u8)(235 * al)));  /* frame, 2 wide */
+    if (cm->icon[0]) img_draw_cover(cm->icon, IMG_SMALL, ix, iy, is, is, al);
+    else gfx_rect_vgrad(ix, iy, is, is, rgba(0x7D, 0xC8, 0xF5, (u8)(255 * al)), rgba(0x3A, 0x7F, 0xD6, (u8)(255 * al)));
+    float tx = ix + is + 14, tw = x + w - tx - 4;
+    ui_text_fit_scroll(FONT_CUBE, 16, 0, tx, iy + 1, tw, 24, rgba(0xF2, 0xF5, 0xFF, (u8)(255 * al)), cm->name);
+    /* followers in a soft bar, as on the Wii U */
+    if (cm->followers[0]) {
+        float bw = gfx_text_width(FONT_ROUND, 12, cm->followers, -1) + 24;
+        if (bw < 110) bw = 110;
+        if (bw > tw) bw = tw;
+        float by = iy + is - 22;
+        gfx_rect(tx, by, bw, 20, rgba(0x8a, 0x94, 0xa8, (u8)(110 * al)));
+        ui_text_fit_scroll(FONT_ROUND, 12, 0, tx + 10, by, bw - 16, 20, rgba(0xdf, 0xe4, 0xee, (u8)(255 * al)), cm->followers);
     }
-    ui_text_fit_scroll(FONT_CUBE, 13, 0, x + 10, y + bh + 6, w - 20, 20, color_alpha(CV_INK, al), cm->name);
-    ui_text_fit_scroll(FONT_ROUND, 11, 0, x + 10, y + bh + 26, w - 20, 16, color_alpha(CV_INK2, al), cm->followers);
-    if (hot) ui_gold_ring(x, y, w, TILE_H, 0.5f + 0.5f * sinf(g_time * 4), al);
+    if (hot) ui_gold_ring(x - 4, y + 3, w + 8, ROW_H - 6, 0.5f + 0.5f * sinf(g_time * 4), al);
+}
+
+/* a dashed line between rows */
+static void dashes(float x, float y, float w, float al) {
+    for (float d = x; d < x + w; d += 10) gfx_rect(d, y, (d + 6 < x + w ? 6 : x + w - d), 2, rgba(200, 210, 230, (u8)(60 * al)));
+}
+
+/* a section's heading: a band of colour with the name on it */
+static void heading(const char *name, float x, float y, float w, float al) {
+    float h = HEAD_H - 8;
+    float xy[8] = { x, y, x + w, y, x + w, y + h, x, y + h };
+    Color c4[4] = { rgba(0x2F, 0xA6, 0xE0, (u8)(230 * al)), rgba(0x2F, 0xA6, 0xE0, (u8)(70 * al)),
+                    rgba(0x1D, 0x6A, 0xA6, (u8)(70 * al)), rgba(0x1D, 0x6A, 0xA6, (u8)(230 * al)) };
+    gfx_quad_colors(xy, c4);
+    ui_text(FONT_CUBE, 15, 0.4f, x + 12, y, h, rgba(255, 255, 255, (u8)(255 * al)), name);
 }
 
 static void draw(float open) {
@@ -118,30 +128,33 @@ static void draw(float open) {
     else if (page.ncomms == 0) cv_center_note(x, y, w, bottom - y, "No communities", "Juxt didn't list any communities.", false, 1);
     else {
         int nc = cols();
-        float tw = (w - GAP * (nc - 1)) / nc;
+        float cw = (w - COL_GAP * (nc - 1)) / nc;
         cv_list_begin(x, y, w, bottom);
-        float top = y + 6 - scroll;
+        float top = y + 4 - scroll;
         int col = 0;
         float yy = top;
         for (int i = 0; i < page.ncomms; i++) {
             /* Popular & New: a heading for each part */
             if (tab == 0 && page.npopular > 0 && (i == 0 || i == page.npopular)) {
-                if (col) { yy += TILE_H + GAP; col = 0; }
-                if (yy > y - 30 && yy < bottom)
-                    ui_text(FONT_MENU, 13, 1.4f, x + 2, yy, 22, rgba(0xc9, 0xd2, 0xee, 255), i == 0 ? "Popular" : "New");
-                yy += 28;
+                if (col) { yy += ROW_H; col = 0; }
+                if (yy > y - HEAD_H && yy < bottom) heading(i == 0 ? "Popular Communities" : "New Communities", x, yy, w, 1);
+                yy += HEAD_H;
             }
-            float tx = x + col * (tw + GAP), ty = yy;
+            float tx = x + col * (cw + COL_GAP), ty = yy;
             item_top[i] = ty - y + scroll;
-            item_bot[i] = item_top[i] + TILE_H;
-            if (ty + TILE_H > y - 10 && ty < bottom + 10) {
-                float vy = ty < y ? y : ty, vb = ty + TILE_H > bottom ? bottom : ty + TILE_H;
-                bool hot = vb > vy && ptr_hot(ID_TILE + i, tx, vy, tw, vb - vy);
-                tile(&page.comms[i], tx, ty, tw, hot, 1);
+            item_bot[i] = item_top[i] + ROW_H;
+            if (ty + ROW_H > y - 10 && ty < bottom + 10) {
+                float vy = ty < y ? y : ty, vb = ty + ROW_H > bottom ? bottom : ty + ROW_H;
+                bool hot = vb > vy && ptr_hot(ID_TILE + i, tx - 4, vy, cw + 8, vb - vy);
+                row(&page.comms[i], tx, ty, cw, hot, 1);
+                /* the line under it, unless the next thing is a heading or the end */
+                int sec_end = tab == 0 && page.npopular > 0 && i < page.npopular ? page.npopular : page.ncomms;
+                bool last_row = i - col + nc >= sec_end;
+                if (!last_row) dashes(tx, ty + ROW_H - 1, cw, 1);
             }
-            if (++col == nc) { col = 0; yy += TILE_H + GAP; }
+            if (++col == nc) { col = 0; yy += ROW_H; }
         }
-        if (col) yy += TILE_H + GAP;
+        if (col) yy += ROW_H;
         content_h = yy - top;
         cv_list_end(content_h - scroll > bottom - y + 4, 1);
     }

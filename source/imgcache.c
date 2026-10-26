@@ -1,4 +1,11 @@
-/* imgcache.c - see imgcache.h. */
+/* imgcache.c - see imgcache.h.
+ *
+ * Each picture, once fetched, decoded and shrunk to the size it's shown at,
+ * is also saved on the SD card (sd:/cubeverse/cache) exactly as the GPU
+ * wants it, so next time it's just read back: no network, no decoding.
+ * Faces and icons are fetched again after a few days (people change their
+ * Mii); drawings and screenshots never change. The cache is kept under
+ * 48 MB by clearing out the oldest files when CubeVerse starts. */
 #include "imgcache.h"
 #include "web.h"
 #include "net.h"
@@ -15,6 +22,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include "storage.h"
 
 #define NIMG 72
 #define MAX_BYTES (4u * 1024 * 1024)
@@ -84,8 +95,125 @@ static void target_size(ImgKind k, int sw, int sh, int *dw, int *dh) {
     if (*dh < 1) *dh = 1;
 }
 
+/* ---- the SD card cache ---- */
+#define CACHE_DIR DATA_DIR "/cache"
+#define CACHE_MAX (48u * 1024 * 1024)
+#define CACHE_KEEP (36u * 1024 * 1024)
+#define SMALL_DAYS 3
+typedef struct { char magic[4]; uint16_t w, h, tw, th; uint32_t saved; } CacheHead;   /* 16 bytes, then the texture */
+
+static void cache_path(const Entry *e, char *out, size_t cap) {
+    uint64_t hsh = 1469598103934665603ull;   /* FNV-1a of the address and the size it's shown at */
+    for (const char *p = e->url; *p; p++) { hsh ^= (uint8_t)*p; hsh *= 1099511628211ull; }
+    hsh ^= (uint64_t)e->kind + 1; hsh *= 1099511628211ull;
+    snprintf(out, cap, "%s/%02x/%014llx.tex", CACHE_DIR, (unsigned)(hsh >> 56), (unsigned long long)(hsh & 0xFFFFFFFFFFFFFFull));
+}
+
+static bool cache_read(Entry *e) {
+    char path[160];
+    cache_path(e, path, sizeof(path));
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    CacheHead h;
+    bool ok = fread(&h, 1, sizeof(h), f) == sizeof(h) && !memcmp(h.magic, "CVT1", 4) && h.w && h.h && h.tw >= h.w &&
+              h.th >= h.h && h.tw <= 1024 && h.th <= 1024 && !(h.tw & 3) && !(h.th & 3);
+    if (ok && e->kind == IMG_SMALL) {
+        time_t now = time(NULL);
+        if (now > (time_t)h.saved + SMALL_DAYS * 86400) ok = false;   /* stale: fetch it again */
+    }
+    void *t = NULL;
+    if (ok) {
+        size_t n = (size_t)h.tw * h.th * 2;
+        t = memalign(32, n);
+        ok = t && fread(t, 1, n, f) == n;
+    }
+    fclose(f);
+    if (!ok) { free(t); return false; }
+    e->data = t;
+    e->w = h.w; e->h = h.h; e->tw = h.tw; e->th = h.th;
+    e->state = E_DECODED;
+    return true;
+}
+
+static void cache_write(const Entry *e, const void *tex) {
+    if (!storage_ok()) return;
+    char path[160];
+    cache_path(e, path, sizeof(path));
+    char dir[160];
+    snprintf(dir, sizeof(dir), "%s", path);
+    char *sl = strrchr(dir, '/');
+    if (sl) *sl = 0;
+    storage_mkdirs(dir);
+    size_t n = (size_t)e->tw * e->th * 2;
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    CacheHead h;
+    memcpy(h.magic, "CVT1", 4);
+    h.w = (uint16_t)e->w; h.h = (uint16_t)e->h; h.tw = (uint16_t)e->tw; h.th = (uint16_t)e->th;
+    h.saved = (uint32_t)time(NULL);
+    bool ok = fwrite(&h, 1, sizeof(h), f) == sizeof(h) && fwrite(tex, 1, n, f) == n;
+    ok = fclose(f) == 0 && ok;
+    if (!ok) remove(path);   /* never leave half a file */
+}
+
+/* Keeps the cache under CACHE_MAX: if it's bigger, the oldest files go
+ * until it's under CACHE_KEEP. */
+typedef struct { char name[24]; uint8_t dir; uint32_t size; time_t when; } CFile;
+static void cache_trim(void) {
+    if (!storage_ok() || !storage_is_dir(CACHE_DIR)) return;
+    size_t cap = 4096, n = 0;
+    CFile *list = malloc(cap * sizeof(CFile));
+    if (!list) return;
+    uint64_t total = 0;
+    for (int d = 0; d < 256 && !quit; d++) {
+        char dir[160];
+        snprintf(dir, sizeof(dir), "%s/%02x", CACHE_DIR, d);
+        DIR *dp = opendir(dir);
+        if (!dp) continue;
+        struct dirent *de;
+        while ((de = readdir(dp))) {
+            if (de->d_name[0] == '.' || strlen(de->d_name) >= sizeof(list[0].name)) continue;
+            char p[200];
+            snprintf(p, sizeof(p), "%s/%s", dir, de->d_name);
+            struct stat st;
+            if (stat(p, &st) != 0) continue;
+            total += (uint64_t)st.st_size;
+            if (n == cap) {
+                CFile *m = realloc(list, cap * 2 * sizeof(CFile));
+                if (!m) break;
+                list = m;
+                cap *= 2;
+            }
+            snprintf(list[n].name, sizeof(list[n].name), "%s", de->d_name);
+            list[n].dir = (uint8_t)d;
+            list[n].size = (uint32_t)st.st_size;
+            list[n].when = st.st_mtime;
+            n++;
+        }
+        closedir(dp);
+    }
+    if (total > CACHE_MAX) {
+        /* oldest first */
+        for (size_t i = 1; i < n; i++) {
+            CFile c = list[i];
+            size_t j = i;
+            while (j > 0 && list[j - 1].when > c.when) { list[j] = list[j - 1]; j--; }
+            list[j] = c;
+        }
+        int removed = 0;
+        for (size_t i = 0; i < n && total > CACHE_KEEP; i++) {
+            char p[200];
+            snprintf(p, sizeof(p), "%s/%02x/%s", CACHE_DIR, list[i].dir, list[i].name);
+            if (remove(p) == 0) { total -= list[i].size; removed++; }
+        }
+        app_log_later("Picture cache trimmed: %d files removed", removed);
+    }
+    free(list);
+}
+
 static void load(Entry *e) {
     char err[160];
+    if (cache_read(e)) return;   /* saved on the SD card last time */
     if (net_state() != NET_UP) { e->state = net_state() == NET_FAILED ? E_FAILED : E_WANTED; return; }
     static bool tls;
     if (!tls) {
@@ -113,11 +241,13 @@ static void load(Entry *e) {
     if (!t) { e->state = E_FAILED; return; }
     e->data = t;
     e->w = dw; e->h = dh; e->tw = tw; e->th = th;
+    cache_write(e, t);
     e->state = E_DECODED;
 }
 
 static void *img_main(void *arg) {
     (void)arg;
+    cache_trim();
     while (!quit) {
         Entry *pick = NULL;
         thr_lock(&lock);

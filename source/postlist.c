@@ -87,7 +87,7 @@ float pl_card(const JPost *p, float x, float y, float w, bool hot, bool yeah_hot
     }
     if (paint) {
         if (by > cy) by += 6;
-        gfx_rect(cx - 1, by - 1, pw + 2, ph + 2, rgba(0xCB, 0xD3, 0xE6, (u8)(255 * al)));
+        gfx_rect(cx - 2, by - 2, pw + 4, ph + 4, rgba(0xCB, 0xD3, 0xE6, (u8)(255 * al)));   /* 2 wide: 1 can vanish in 16:9 */
         gfx_rect(cx, by, pw, ph, rgba(255, 255, 255, (u8)(255 * al)));
         img_draw_fit(p->painting, IMG_PAINTING, cx, by, pw, ph, al);
         by += ph + 2;
@@ -136,7 +136,7 @@ static void tile(const JPost *p, float x, float y, float w, bool hot, float al) 
     if (p->removed) ui_text(FONT_ROUND, 12, 0, bx, by, 20, ink2, "This post was removed.");
     else if (p->spoiler) ui_text(FONT_ROUND, 12, 0, bx, by, 20, color_alpha(CV_YEAH, al), "Spoilers!");
     else if (p->painting[0]) {
-        gfx_rect(bx - 1, by - 1, bw + 2, bh + 2, rgba(0xCB, 0xD3, 0xE6, (u8)(255 * al)));
+        gfx_rect(bx - 2, by - 2, bw + 4, bh + 4, rgba(0xCB, 0xD3, 0xE6, (u8)(255 * al)));
         gfx_rect(bx, by, bw, bh, rgba(255, 255, 255, (u8)(255 * al)));
         img_draw_fit(p->painting, IMG_PAINTING, bx, by, bw, bh, al);
     } else if (p->shot[0] && !p->text[0]) {

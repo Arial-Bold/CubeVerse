@@ -37,7 +37,7 @@ static void enter(const char *arg, bool back) {
         tab = 0;
     }
     if (!back || page.state != JS_READY || g_posted) {
-        pl_init(&list, &page, UI_W > 700 ? 4 : 3, ID_LIST);
+        pl_init(&list, &page, 2, ID_LIST);   /* two columns */
         list.show_community = true;
         load();
     }
@@ -77,16 +77,16 @@ static void update(void) {
 }
 
 static void stat_box(float x, float y, const char *s) {
-    /* "123 followers" -> big number over a small word */
+    /* "123 followers" -> a number over a small word, in a short box */
     char num[24], word[40];
     int n = (int)strcspn(s, " ");
     snprintf(num, sizeof(num), "%.*s", n < 23 ? n : 23, s);
     snprintf(word, sizeof(word), "%s", s[n] ? s + n + 1 : "");
-    float w = 76;
-    gfx_rect_vgrad(x, y, w, 44, rgba(140, 160, 180, 56), rgba(70, 90, 110, 36));
-    gfx_rrect_outline(x, y, w, 44, 0, 1, rgba(215, 225, 240, 90));
-    ui_text_center(FONT_CUBE, 16, 0, x + w / 2, y + 4, 20, COL_TEXT, num);
-    ui_text_center(FONT_MENU, 10, 1.0f, x + w / 2, y + 24, 14, COL_SOFT, word);
+    float w = 70, h = 36;
+    gfx_rect_vgrad(x, y, w, h, rgba(140, 160, 180, 56), rgba(70, 90, 110, 36));
+    gfx_rrect_outline(x, y, w, h, 0, 2, rgba(215, 225, 240, 90));
+    ui_text_center(FONT_CUBE, 14, 0, x + w / 2, y + 2, 18, COL_TEXT, num);
+    ui_text_center(FONT_MENU, 9, 1.0f, x + w / 2, y + 20, 13, COL_SOFT, word);
 }
 
 static void draw(float open) {
@@ -95,28 +95,28 @@ static void draw(float open) {
     bool me = mine();
     cv_title(me ? "My page" : (page.title[0] ? page.title : "Profile"), CV_T_PURPLE, page.subtitle, 1);
     float x = CV_L + 18, w = UI_W - 2 * x;
-    /* header */
-    float hy = 54;
+    /* header: one short row (half the old height) */
+    float hy = 52, hh = 36;
     const char *name = page.title[0] ? page.title : (me ? juxt_my_name() : "");
-    cv_face(page.icon[0] ? page.icon : (me ? juxt_my_mii() : ""), name, x, hy, 64, 1);
+    cv_face(page.icon[0] ? page.icon : (me ? juxt_my_mii() : ""), name, x, hy, hh, 1);
     float sx = x + w;
-    if (page.stat2[0]) { sx -= 76; stat_box(sx, hy + 10, page.stat2); sx -= 6; }
-    if (page.stat1[0]) { sx -= 76; stat_box(sx, hy + 10, page.stat1); sx -= 6; }
+    if (page.stat2[0]) { sx -= 70; stat_box(sx, hy, page.stat2); sx -= 6; }
+    if (page.stat1[0]) { sx -= 70; stat_box(sx, hy, page.stat1); sx -= 6; }
     if (page.can_follow && !me) {
         const char *fl = page.following ? "Following" : "Follow";
         float fw = gfx_text_width(FONT_ROUND, 13, fl, -1) + 28;
         sx -= fw + 6;
-        bool hf = ptr_hot(ID_FOLLOW, sx, hy + 20, fw, 26);
-        cv_pill(sx, hy + 20, fw, 26, fl, page.following ? rgba(0x7D, 0x5B, 0xD6, 255) : rgba(255, 255, 255, 255),
+        bool hf = ptr_hot(ID_FOLLOW, sx, hy + 6, fw, 24);
+        cv_pill(sx, hy + 6, fw, 24, fl, page.following ? rgba(0x7D, 0x5B, 0xD6, 255) : rgba(255, 255, 255, 255),
                 page.following ? rgba(255, 255, 255, 255) : CV_INK, hf, 1);
         sx -= 6;
     }
-    float tx = x + 78, tw = sx - 10 - tx;
-    ui_text_fit_scroll(FONT_CUBE, 20, 0, tx, hy + 4, tw, 26, rgba(255, 255, 255, 255), name);
-    ui_text_fit_scroll(FONT_MENU, 13, 1.0f, tx, hy + 34, tw, 22, rgba(0xdf, 0xe4, 0xee, 255),
+    float tx = x + hh + 10, tw = sx - 10 - tx;
+    ui_text_fit_scroll(FONT_CUBE, 16, 0, tx, hy, tw, 20, rgba(255, 255, 255, 255), name);
+    ui_text_fit_scroll(FONT_MENU, 11, 1.0f, tx, hy + 20, tw, 16, rgba(0xdf, 0xe4, 0xee, 255),
                        page.desc[0] ? page.desc : (page.state == JS_READY ? "" : " "));
-    cv_tabs(CV_L + 10, 130, TABS, 2, tab, ID_TAB, 1);
-    pl_draw(&list, x, 164, w, CV_BOTTOM, 1);
+    cv_tabs(CV_L + 10, 96, TABS, 2, tab, ID_TAB, 1);
+    pl_draw(&list, x, 130, w, CV_BOTTOM, 1);
     if (page.can_follow && !me) {
         const char *h[] = { "S:Pointer", "LR:Tab", "X:Yeah!", "B:Back", "A:Open" };
         ui_hints(h, 5, 1, input_stick_dir());

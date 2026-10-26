@@ -28,6 +28,9 @@
 #define CV_BOTTOM 418.0f
 
 void  cv_background(float alpha);
+/* which background (0 pinstripes, 1-4 old TV looks) */
+void  cv_set_bg_style(int s);
+int   cv_bg_style(void);
 /* Section title in its colour, a soft right-hand text, and the rule under them. */
 void  cv_title(const char *left, Color c, const char *right, float alpha);
 /* Silver tabs from x at y. Returns the width used. Tab i is clickable as

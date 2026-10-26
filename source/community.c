@@ -86,30 +86,30 @@ static void draw(float open) {
     cv_title(name[0] ? name : "Community", CV_T_BLUE, page.stat1, 1);
     float x = CV_L + 18, w = UI_W - 2 * x;
     /* header: icon, description, buttons */
-    float hy = 56;
-    if (page.icon[0]) img_draw_cover(page.icon, IMG_SMALL, x, hy, 32, 32, 1);
-    else gfx_rect(x, hy, 32, 32, rgba(0x2F, 0xA6, 0xE0, 255));
+    float hy = 52;   /* one short row (half the old height) */
+    if (page.icon[0]) img_draw_cover(page.icon, IMG_SMALL, x, hy, 22, 22, 1);
+    else gfx_rect(x, hy, 22, 22, rgba(0x2F, 0xA6, 0xE0, 255));
     float bx = x + w;
     float pw = gfx_text_width(FONT_ROUND, 13, "+ Post here", -1) + 28;
     bx -= pw;
-    bool hp = ptr_hot(ID_POST, bx, hy + 5, pw, 24);
-    cv_pill(bx, hy + 5, pw, 24, "+ Post here", rgba(0x29, 0xA8, 0xE0, 255), rgba(255, 255, 255, 255), hp, 1);
+    bool hp = ptr_hot(ID_POST, bx, hy, pw, 22);
+    cv_pill(bx, hy, pw, 22, "+ Post here", rgba(0x29, 0xA8, 0xE0, 255), rgba(255, 255, 255, 255), hp, 1);
     const char *fl = page.following ? "Following" : "Follow";
     float fw = gfx_text_width(FONT_ROUND, 13, fl, -1) + 28;
     bx -= fw + 8;
-    bool hf = ptr_hot(ID_FOLLOW, bx, hy + 5, fw, 24);
+    bool hf = ptr_hot(ID_FOLLOW, bx, hy, fw, 22);
     if (page.following) {
-        gfx_rect_vgrad(bx, hy + 5, fw, 24, rgba(140, 160, 180, 90), rgba(70, 90, 110, 60));
-        gfx_rrect_outline(bx, hy + 5, fw, 24, 0, 1, rgba(215, 225, 240, 150));
-        ui_text_center(FONT_ROUND, 13, 0, bx + fw / 2, hy + 5, 24, rgba(0xdf, 0xe4, 0xee, 255), fl);
-        if (hf) ui_gold_ring(bx, hy + 5, fw, 24, 0.5f, 1);
+        gfx_rect_vgrad(bx, hy, fw, 22, rgba(140, 160, 180, 90), rgba(70, 90, 110, 60));
+        gfx_rrect_outline(bx, hy, fw, 22, 0, 2, rgba(215, 225, 240, 150));
+        ui_text_center(FONT_ROUND, 13, 0, bx + fw / 2, hy, 22, rgba(0xdf, 0xe4, 0xee, 255), fl);
+        if (hf) ui_gold_ring(bx, hy, fw, 22, 0.5f, 1);
     } else {
-        cv_pill(bx, hy + 5, fw, 24, fl, rgba(255, 255, 255, 255), CV_INK, hf, 1);
+        cv_pill(bx, hy, fw, 22, fl, rgba(255, 255, 255, 255), CV_INK, hf, 1);
     }
     const char *desc = page.desc[0] ? page.desc : (page.state == JS_READY ? "" : " ");
-    ui_text_fit_scroll(FONT_MENU, 13, 1.0f, x + 44, hy, bx - 12 - (x + 44), 32, rgba(0xdf, 0xe4, 0xee, 255), desc);
-    cv_tabs(CV_L + 10, 98, TABS, 2, tab, ID_TAB, 1);
-    pl_draw(&list, x, 132, w, CV_BOTTOM, 1);
+    ui_text_fit_scroll(FONT_MENU, 12, 1.0f, x + 32, hy, bx - 12 - (x + 32), 22, rgba(0xdf, 0xe4, 0xee, 255), desc);
+    cv_tabs(CV_L + 10, 80, TABS, 2, tab, ID_TAB, 1);
+    pl_draw(&list, x, 114, w, CV_BOTTOM, 1);
     const char *h[] = { "S:Pointer", "LR:Tab", "X:Yeah!", "Y:Post", "Z:Their page", "B:Back", "A:Open" };
     ui_hints(h, 7, 1, input_stick_dir());
 }

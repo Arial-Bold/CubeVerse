@@ -258,7 +258,7 @@ static void draw(float open) {
     /* the canvas */
     upload();
     gfx_rect(cvx - 3, cvy - 3, cvw + 6, cvh + 6, rgba(200, 208, 220, 140));
-    gfx_rect(cvx - 1, cvy - 1, cvw + 2, cvh + 2, rgba(10, 13, 16, 255));
+    gfx_rect(cvx - 2, cvy - 2, cvw + 4, cvh + 4, rgba(10, 13, 16, 255));
     if (tex_ok) gfx_image_draw(&tex, cvx, cvy, cvw, cvh, rgba(255, 255, 255, 255));
     else gfx_rect(cvx, cvy, cvw, cvh, rgba(255, 255, 255, 255));
     bool on_canvas = ptr_hot(ID_CANVAS, cvx, cvy, cvw, cvh);

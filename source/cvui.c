@@ -9,17 +9,84 @@
 
 const char *const CV_FEELINGS[6] = { "Normal", "Happy", "Wink", "Surprised", "Frustrated", "Puzzled" };
 
+/* Background styles (see cv_set_bg_style): 0 the pinstripes; 1-4 an old TV
+ * (thick scanlines bowed by the curve of the glass, and a tube-shaped dark
+ * edge): 1 classic, 2 soft phosphor, 3 lit lines, 4 classic with a rolling bar. */
+static int bg_style = 2;   /* soft phosphor */
+void cv_set_bg_style(int s) { bg_style = s < 0 ? 0 : s > 4 ? 4 : s; }
+int cv_bg_style(void) { return bg_style; }
+
+/* A point of the screen bowed out like the face of a picture tube:
+ * u, v from -1 to 1 across the area; k how much it bulges. */
+static void tube_point(float fx, float fy, float fw, float fh, float u, float v, float k, float *x, float *y) {
+    float bu = u * (1 + k * v * v), bv = v * (1 + k * 1.4f * u * u);
+    *x = fx + fw * (bu + 1) / 2;
+    *y = fy + fh * (bv + 1) / 2;
+}
+
+/* scanlines: a soft band per line, drawn as meshes bowed by the tube */
+static void scanlines(float fx, float fy, float fw, float fh, float period, float bulge, Color c, float al) {
+    enum { SC = 16, ROWS = 63 };
+    float xy[(SC + 1) * (ROWS + 1) * 2];
+    Color col[(SC + 1) * (ROWS + 1)];
+    /* each line: clear, full, full, (clear at the next line) - 3 rows a line */
+    int nrows = (int)(fh / period) * 3 + 1;
+    static const float pos[3] = { 0, 0.3f, 0.72f };
+    for (int r0 = 0; r0 < nrows - 1; r0 += ROWS) {
+        int rows = nrows - 1 - r0 < ROWS ? nrows - 1 - r0 : ROWS;
+        for (int j = 0; j <= rows; j++) {
+            int r = r0 + j, line = r / 3, ph = r % 3;
+            float yy = (line + pos[ph]) * period;
+            float v = yy / fh * 2 - 1;
+            for (int i = 0; i <= SC; i++) {
+                int k = j * (SC + 1) + i;
+                float u = (float)i / SC * 2 - 1;
+                tube_point(fx, fy, fw, fh, u, v, bulge, &xy[k * 2], &xy[k * 2 + 1]);
+                col[k] = rgba(c.r, c.g, c.b, (u8)(ph ? c.a * al : 0));
+            }
+        }
+        gfx_mesh(SC, rows, xy, col);
+    }
+}
+
+/* the dark edge, shaped like a TV tube: a rounded rectangle (a superellipse) */
+static void tube_edge(float fx, float fy, float fw, float fh, float start, float al) {
+    enum { VC = 24, VR = 18 };
+    float vxy[(VC + 1) * (VR + 1) * 2];
+    Color vc[(VC + 1) * (VR + 1)];
+    for (int j = 0; j <= VR; j++)
+        for (int i = 0; i <= VC; i++) {
+            int k = j * (VC + 1) + i;
+            float u = (float)i / VC * 2 - 1, v = (float)j / VR * 2 - 1;
+            vxy[k * 2] = fx + fw * i / VC;
+            vxy[k * 2 + 1] = fy + fh * j / VR;
+            float au = fabsf(u) * 1.02f, av = fabsf(v) * 1.04f;
+            float d = powf(powf(au, 5) + powf(av, 5), 0.2f);   /* 1 on the rounded rectangle */
+            float d2 = sqrtf(u * u * 0.8f + v * v);           /* and a gentle round falloff inside */
+            float t = clamp01((d - start) / (1.0f - start)), t2 = clamp01((d2 - 0.35f) / 0.9f);
+            float a = 1 - (1 - powf(t, 1.6f)) * (1 - 0.55f * t2 * t2);
+            vc[k] = rgba(0, 0, 0, (u8)(clamp01(a) * 255 * al));
+        }
+    gfx_mesh(VC, VR, vxy, vc);
+}
+
 void cv_background(float al) {
     if (al <= 0) return;
     float fx, fy, fw, fh;
     gfx_full_area(&fx, &fy, &fw, &fh);
     u8 A = (u8)(255 * clamp01(al));
-    /* deep blue-black, a little lighter at the top */
-    gfx_rect_vgrad(fx, fy, fw, fh, rgba(0x0e, 0x12, 0x18, A), rgba(0x06, 0x08, 0x0b, A));
-    /* a cool glow from above and a fainter one from below */
+    /* deep blue-black, a little lighter at the top (the old TV looks a bit
+     * lighter still, so their dark scanlines show) */
+    if (bg_style == 1 || bg_style == 2 || bg_style == 4)
+        gfx_rect_vgrad(fx, fy, fw, fh, rgba(0x1c, 0x24, 0x31, A), rgba(0x0c, 0x10, 0x16, A));
+    else
+        gfx_rect_vgrad(fx, fy, fw, fh, rgba(0x0e, 0x12, 0x18, A), rgba(0x06, 0x08, 0x0b, A));
+    /* a cool glow from above and a fainter one from below (on the soft
+     * phosphor screen, a stronger glow in the middle) */
     enum { C = 12, R = 8 };
     float xy[(C + 1) * (R + 1) * 2];
     Color col[(C + 1) * (R + 1)];
+    float glow = bg_style == 2 ? 1.7f : 1.0f;
     for (int pass = 0; pass < 2; pass++) {
         for (int j = 0; j <= R; j++)
             for (int i = 0; i <= C; i++) {
@@ -28,18 +95,37 @@ void cv_background(float al) {
                 xy[k * 2] = x;
                 xy[k * 2 + 1] = y;
                 float dx = (x - (fx + fw / 2)) / (fw * (pass ? 0.45f : 0.6f));
-                float dy = pass ? (y - (fy + fh * 1.18f)) / (fh * 0.55f) : (y - (fy - fh * 0.12f)) / (fh * 0.7f);
+                float dy;
+                if (bg_style == 2) dy = pass ? (y - (fy + fh * 0.5f)) / (fh * 0.5f) : (y - (fy + fh * 0.3f)) / (fh * 0.7f);
+                else dy = pass ? (y - (fy + fh * 1.18f)) / (fh * 0.55f) : (y - (fy - fh * 0.12f)) / (fh * 0.7f);
                 float d = sqrtf(dx * dx + dy * dy);
                 float v = clamp01(1 - d / (pass ? 0.66f : 0.62f));
-                col[k] = pass ? rgba(60, 110, 175, (u8)(v * 0.13f * 255 * al)) : rgba(120, 170, 225, (u8)(v * 0.17f * 255 * al));
+                col[k] = pass ? rgba(60, 110, 175, (u8)(clamp01(v * 0.13f * glow) * 255 * al))
+                              : rgba(120, 170, 225, (u8)(clamp01(v * 0.17f * glow) * 255 * al));
             }
         gfx_mesh(C, R, xy, col);
     }
-    /* pinstripes, a hint of the Wii menu: every 6 units, 2 thick */
-    Color line = rgba(255, 255, 255, (u8)(0.045f * 255 * al));
-    for (float y = fy; y < fy + fh; y += 6) gfx_rect(fx, gfx_snap_y(y), fw, 2, line);
-    /* a vignette: the edges fade to black */
-    {
+    if (bg_style == 0) {
+        /* pinstripes, a hint of the Wii menu: every 6 units, 2 thick */
+        Color line = rgba(255, 255, 255, (u8)(0.045f * 255 * al));
+        for (float y = fy; y < fy + fh; y += 6) gfx_rect(fx, gfx_snap_y(y), fw, 2, line);
+    } else if (bg_style == 1 || bg_style == 4) {
+        scanlines(fx, fy, fw, fh, 6, 0.07f, rgba(0, 0, 0, 200), al);
+        /* a little light between the lines, so they read as lines of light */
+        scanlines(fx, fy - 3, fw, fh, 6, 0.07f, rgba(150, 190, 255, 12), al);
+    } else if (bg_style == 2) {
+        scanlines(fx, fy, fw, fh, 8, 0.06f, rgba(0, 0, 0, 150), al);
+    } else if (bg_style == 3) {
+        scanlines(fx, fy, fw, fh, 7, 0.07f, rgba(200, 225, 255, 34), al);
+    }
+    if (bg_style == 4) {
+        /* the rolling bar: a soft band of light drifting slowly down */
+        float t = fmodf(g_time / 9.0f, 1.0f), by = fy - fh * 0.25f + t * fh * 1.5f, bh = fh * 0.22f;
+        gfx_rect_vgrad(fx, by - bh, fw, bh, rgba(170, 200, 255, 0), rgba(170, 200, 255, (u8)(14 * al)));
+        gfx_rect_vgrad(fx, by, fw, bh, rgba(170, 200, 255, (u8)(14 * al)), rgba(170, 200, 255, 0));
+    }
+    if (bg_style == 0) {
+        /* a vignette: the edges fade to black */
         enum { VC = 16, VR = 12 };
         float vxy[(VC + 1) * (VR + 1) * 2];
         Color vc[(VC + 1) * (VR + 1)];
@@ -54,6 +140,8 @@ void cv_background(float al) {
                 vc[k] = rgba(0, 0, 0, (u8)(powf(t, 1.5f) * 255 * al));
             }
         gfx_mesh(VC, VR, vxy, vc);
+    } else {
+        tube_edge(fx, fy, fw, fh, bg_style == 2 ? 0.62f : 0.7f, al);
     }
 }
 
@@ -77,7 +165,7 @@ float cv_tabs(float x, float y, const char *const *labels, int n, int on, int ba
         bool hot = ptr_hot(base + i, x, y, tw, 25);
         if (i == on) {
             gfx_rect_vgrad(x, y, tw, 25, rgba(140, 160, 180, (u8)(0.34f * 255 * al)), rgba(70, 90, 110, (u8)(0.22f * 255 * al)));
-            gfx_rrect_outline(x, y, tw, 25, 0, 1, rgba(215, 225, 240, (u8)(0.6f * 255 * al)));
+            gfx_rrect_outline(x, y, tw, 25, 0, 2, rgba(215, 225, 240, (u8)(0.6f * 255 * al)));
         } else if (hot) {
             gfx_rect(x, y, tw, 25, rgba(140, 160, 180, (u8)(0.16f * 255 * al)));
         }
