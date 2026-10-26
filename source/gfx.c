@@ -4,6 +4,7 @@
  * points on the CPU, so the GPU only ever sees the same flat drawing it
  * already handles. */
 #include "gfx.h"
+#include "jfont.h"
 #include "font_data.h"
 #include "storage.h"
 #include <stdio.h>
@@ -424,7 +425,7 @@ static void mode_text(int font) {
         GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
         cur_font = -1;
     }
-    if (cur_font != font) {
+    if (font >= 0 && cur_font != font) {   /* (-1: the set-up only; the caller loads a texture) */
         cur_font = font;
         GX_LoadTexObj(&font_tex[font], GX_TEXMAP0);
     }
@@ -870,13 +871,53 @@ float gfx_cap_height(FontId f, float size) {
     return g->h * size / font_px(f);
 }
 
+/* Japanese characters (jfont.c) are UTF-8 in the strings: one full-width
+ * character each, as wide as the text is tall, drawn from their own pages
+ * after the rest of the line. Everything else is a byte a character. */
+static GXTexObj jp_tex[4];
+static int jp_ready = 0;   /* 0 not yet, 1 ready, -1 couldn't */
+
+static bool jp_textures(void) {
+    if (jp_ready) return jp_ready > 0;
+    jp_ready = -1;
+    int n = jfont_pages();
+    if (n > 4) return false;
+    for (int i = 0; i < n; i++) {
+        int h = 0;
+        const uint8_t *pg = jfont_page(i, &h);
+        if (!pg) return false;
+        GX_InitTexObj(&jp_tex[i], (void *)pg, 1024, (u16)h, GX_TF_I4, GX_CLAMP, GX_CLAMP, GX_FALSE);
+        GX_InitTexObjLOD(&jp_tex[i], GX_LINEAR, GX_LINEAR, 0.0f, 0.0f, 0.0f, GX_FALSE, GX_FALSE, GX_ANISO_1);
+    }
+    tex_invalidate = true;
+    GX_InvalidateTexAll();
+    jp_ready = 1;
+    return true;
+}
+
+/* steps through a string: the width of the next character (in font units),
+ * its length in bytes, and its Japanese glyph number (or -1) */
+static inline float char_adv(FontId f, const FontGlyph *G, const char *s, int i, int len, int *bytes, int *jp) {
+    int j = (unsigned char)s[i] >= 0xE0 ? jfont_at(s, i, len) : -1;
+    *jp = j;
+    if (j >= 0) { *bytes = 3; return font_px(f); }
+    *bytes = 1;
+    return glyph_for(G, (unsigned char)s[i])->adv;
+}
+
 float gfx_text_width_sp(FontId f, float size, float spacing, const char *s, int len) {
     if (len < 0) len = (int)strlen(s);
     const FontGlyph *G = glyph_table(f);
     float w = 0;
-    for (int i = 0; i < len; i++) w += glyph_for(G, (unsigned char)s[i])->adv;
+    int chars = 0;
+    for (int i = 0; i < len;) {
+        int nb, jp;
+        w += char_adv(f, G, s, i, len, &nb, &jp);
+        i += nb;
+        chars++;
+    }
     w = w * size / font_px(f);
-    if (len > 1) w += spacing * (len - 1);
+    if (chars > 1) w += spacing * (chars - 1);
     return w;
 }
 
@@ -886,10 +927,12 @@ int gfx_text_fit(FontId f, float size, const char *s, int len, float maxw) {
     if (len < 0) len = (int)strlen(s);
     const FontGlyph *G = glyph_table(f);
     float sc = size / font_px(f), w = 0;
-    for (int i = 0; i < len; i++) {
-        float a = glyph_for(G, (unsigned char)s[i])->adv * sc;
+    for (int i = 0; i < len;) {
+        int nb, jp;
+        float a = char_adv(f, G, s, i, len, &nb, &jp) * sc;
         if (w + a * 0.5f > maxw) return i;
         w += a;
+        i += nb;
     }
     return len;
 }
@@ -900,17 +943,24 @@ float gfx_text_sp(FontId f, float size, float spacing, float x, float y, Color c
     if (!isfinite(x) || !isfinite(y) || !isfinite(size) || size <= 0 || size > 400) return 0;
     const FontGlyph *G = glyph_table(f);
     float sc = size / font_px(f);
-    int n = 0;
-    for (int i = 0; i < len; i++)
-        if (glyph_for(G, (unsigned char)s[i])->w) n++;
+    int n = 0, njp = 0;
+    for (int i = 0; i < len;) {
+        int nb, jp;
+        char_adv(f, G, s, i, len, &nb, &jp);
+        if (jp >= 0) njp++;
+        else if (glyph_for(G, (unsigned char)s[i])->w) n++;
+        i += nb;
+    }
     float cx = x;
     if (n > 0) {
         mode_text(f);
         const float iw = 1.0f / FONT_TEX_W, ih = 1.0f / FONT_TEX_H;
         BEGIN(GX_QUADS, n * 4);
-        for (int i = 0; i < len; i++) {
+        for (int i = 0; i < len;) {
+            int nb, jp;
+            float adv = char_adv(f, G, s, i, len, &nb, &jp);
             const FontGlyph *g = glyph_for(G, (unsigned char)s[i]);
-            if (g->w) {
+            if (jp < 0 && g->w) {
                 float x0 = cx + g->xoff * sc, y0 = y + g->yoff * sc;
                 float x1 = x0 + g->w * sc, y1 = y0 + g->h * sc;
                 float u0 = g->x * iw, v0 = g->y * ih, u1 = (g->x + g->w) * iw, v1 = (g->y + g->h) * ih;
@@ -919,11 +969,60 @@ float gfx_text_sp(FontId f, float size, float spacing, float x, float y, Color c
                 pos(x1, y1); GX_Color4u8(c.r, c.g, c.b, c.a); GX_TexCoord2f32(u1, v1);
                 pos(x0, y1); GX_Color4u8(c.r, c.g, c.b, c.a); GX_TexCoord2f32(u0, v1);
             }
-            cx += g->adv * sc + spacing;
+            cx += adv * sc + spacing;
+            i += nb;
         }
         GX_End();
     } else {
-        for (int i = 0; i < len; i++) cx += glyph_for(G, (unsigned char)s[i])->adv * sc + spacing;
+        for (int i = 0; i < len;) {
+            int nb, jp;
+            cx += char_adv(f, G, s, i, len, &nb, &jp) * sc + spacing;
+            i += nb;
+        }
+    }
+    /* the Japanese characters, a page at a time */
+    if (njp > 0 && jp_textures()) {
+        const FontGlyph *H = glyph_for(G, 'H');
+        float base = y + (H->yoff + H->h) * sc;          /* the line's baseline */
+        float em = size, top = base - jfont_ascent() * em;
+        float px = (float)jfont_px();
+        for (int pg = 0; pg < jfont_pages(); pg++) {
+            int cnt = 0;
+            for (int i = 0; i < len;) {
+                int nb, jp;
+                char_adv(f, G, s, i, len, &nb, &jp);
+                if (jp >= 0) { int p2, gx, gy; jfont_where(jp, &p2, &gx, &gy); if (p2 == pg) cnt++; }
+                i += nb;
+            }
+            if (!cnt) continue;
+            int ph = 0;
+            jfont_page(pg, &ph);
+            mode_text(-1);   /* the text set-up, then this page's texture */
+            GX_LoadTexObj(&jp_tex[pg], GX_TEXMAP0);
+            const float iw = 1.0f / 1024, ih = 1.0f / ph;
+            BEGIN(GX_QUADS, cnt * 4);
+            float jx = x;
+            for (int i = 0; i < len;) {
+                int nb, jp;
+                float adv = char_adv(f, G, s, i, len, &nb, &jp);
+                if (jp >= 0) {
+                    int p2, gx, gy;
+                    jfont_where(jp, &p2, &gx, &gy);
+                    if (p2 == pg) {
+                        float x0 = jx, y0 = top, x1 = jx + em, y1 = top + em;
+                        float u0 = gx * iw, v0 = gy * ih, u1 = (gx + px) * iw, v1 = (gy + px) * ih;
+                        pos(x0, y0); GX_Color4u8(c.r, c.g, c.b, c.a); GX_TexCoord2f32(u0, v0);
+                        pos(x1, y0); GX_Color4u8(c.r, c.g, c.b, c.a); GX_TexCoord2f32(u1, v0);
+                        pos(x1, y1); GX_Color4u8(c.r, c.g, c.b, c.a); GX_TexCoord2f32(u1, v1);
+                        pos(x0, y1); GX_Color4u8(c.r, c.g, c.b, c.a); GX_TexCoord2f32(u0, v1);
+                    }
+                }
+                jx += adv * sc + spacing;
+                i += nb;
+            }
+            GX_End();
+            cur_font = -1;   /* the font texture has to be loaded again next time */
+        }
     }
     return len > 0 ? cx - x - spacing : 0;
 }

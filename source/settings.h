@@ -13,6 +13,8 @@ typedef struct {
     int  video_mode, widescreen, full_width;
     int  margin;           /* screen margin for overscan, percent (0..12) */
     int  intro;            /* play the opening animation */
+    /* Controls */
+    int  pointer_speed;    /* 1 (slow) .. 10 (fast) */
     /* Sound */
     int  sounds, volume;
     int  menu_music;       /* CubeVerse's own background music in the menus */

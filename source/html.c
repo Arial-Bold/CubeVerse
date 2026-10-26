@@ -1,5 +1,6 @@
 /* html.c - see html.h. */
 #include "html.h"
+#include "jfont.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -183,7 +184,15 @@ static void put_utf8(char **o, char *oe, unsigned cp) {
         one[0] = lat[cp - 0xC0];
         rep = one;
     } else if (cp >= 0x1F000 || (cp >= 0x2600 && cp <= 0x27BF) || cp == 0xFE0F || cp == 0x200D) rep = "";   /* emoji */
-    else rep = "?";
+    else if (cp >= 0x800 && cp <= 0xFFFF && jfont_index(cp) >= 0) {
+        /* Japanese: kept as UTF-8 (three bytes), drawn from the Japanese font */
+        if (*o + 3 <= oe) {
+            *(*o)++ = (char)(0xE0 | (cp >> 12));
+            *(*o)++ = (char)(0x80 | ((cp >> 6) & 0x3F));
+            *(*o)++ = (char)(0x80 | (cp & 0x3F));
+        }
+        return;
+    } else rep = "?";
     while (*rep && *o < oe) *(*o)++ = *rep++;
 }
 

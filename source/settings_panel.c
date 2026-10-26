@@ -20,9 +20,9 @@
 #include <gccore.h>
 #endif
 
-enum { S_SCREEN, S_WIDTH, S_MARGIN, S_VIDEO, S_INTRO, S_SOUNDS, S_VOLUME, S_MENU_MUSIC, S_MUSIC, S_ACCOUNT,
+enum { S_SCREEN, S_WIDTH, S_MARGIN, S_VIDEO, S_INTRO, S_POINTER, S_SOUNDS, S_VOLUME, S_MENU_MUSIC, S_MUSIC, S_ACCOUNT,
        S_UPDATE, S_UPDATE_AUTO, S_EXIT_ACTION, S_EXIT_DOL, S_EXIT, SN };
-static const char *const labels[SN] = { "Screen", "Picture width", "Screen margin", "Video", "Opening animation",
+static const char *const labels[SN] = { "Screen", "Picture width", "Screen margin", "Video", "Opening animation", "Pointer speed",
                                         "Menu sounds", "Sound volume", "Menu music", "Music volume", "Pretendo account",
                                         "Software update", "Check for updates at start", "Exit button",
                                         "Program to start", "Exit now" };
@@ -32,6 +32,7 @@ static const char *const help[SN] = {
     "Moves everything in from the edges if your TV cuts them off. The gold corners show where the picture ends.",
     "480p needs component or digital video cables. Auto picks it when they're connected.",
     "Turn off to go straight to the home cubes when CubeVerse starts.",
+    "How fast the pointer moves with the stick. Lower is slower and easier to place.",
     "The little sounds when you move around the menus.",
     "How loud the menu sounds are.",
     "CubeVerse's own background music, the same as Flashcube's.",
@@ -93,6 +94,7 @@ static void change(int d) {
         break;
     case S_INTRO: g_set.intro = !g_set.intro; break;
     case S_SOUNDS: g_set.sounds = !g_set.sounds; break;
+    case S_POINTER: g_set.pointer_speed += d; clampi(&g_set.pointer_speed, 1, 10); break;
     case S_VOLUME: g_set.volume += d; clampi(&g_set.volume, 0, 10); break;
     case S_MENU_MUSIC: g_set.menu_music = !g_set.menu_music; break;
     case S_MUSIC: g_set.music_volume += d; clampi(&g_set.music_volume, 0, 10); break;
@@ -164,6 +166,7 @@ static void value_text(int i, char *out, size_t cap) {
     case S_VIDEO: snprintf(out, cap, "%s", g_set.video_mode == 0 ? "Auto" : g_set.video_mode == 1 ? "480i" : "480p"); break;
     case S_INTRO: snprintf(out, cap, "%s", g_set.intro ? "On" : "Off"); break;
     case S_SOUNDS: snprintf(out, cap, "%s", g_set.sounds ? "On" : "Off"); break;
+    case S_POINTER: snprintf(out, cap, "%d", g_set.pointer_speed); break;
     case S_VOLUME: snprintf(out, cap, "%d", g_set.volume); break;
     case S_MENU_MUSIC: snprintf(out, cap, "%s", g_set.menu_music ? "On" : "Off"); break;
     case S_MUSIC: snprintf(out, cap, "%d", g_set.music_volume); break;

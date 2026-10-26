@@ -215,6 +215,20 @@ void cv_face(const char *url, const char *name, float x, float y, float size, fl
     ui_text_center(FONT_CUBE, size * 0.45f, 0, x + size / 2, y, size, color_alpha(fgs[k], al), l);
 }
 
+/* Japanese has no spaces: a line can break before any Japanese character,
+ * except the ones that mustn't start a line (、。」』）ー and the like). */
+static bool jp_break_before(const char *p, int k) {
+    const unsigned char *u = (const unsigned char *)p + k;
+    if ((u[0] & 0xF0) != 0xE0 || (u[1] & 0xC0) != 0x80 || (u[2] & 0xC0) != 0x80) return false;
+    unsigned cp = ((unsigned)(u[0] & 0x0F) << 12) | ((unsigned)(u[1] & 0x3F) << 6) | (u[2] & 0x3F);
+    if (cp < 0x3000) return false;
+    static const unsigned no_start[] = { 0x3001, 0x3002, 0x300D, 0x300F, 0x3011, 0x3015, 0x30FC, 0x309B, 0x309C, 0x3063,
+                                         0x30C3, 0x3083, 0x3085, 0x3087, 0x30E3, 0x30E5, 0x30E7, 0xFF09, 0xFF0C, 0xFF0E,
+                                         0xFF01, 0xFF1F, 0xFF5D, 0xFF3D };
+    for (unsigned i = 0; i < sizeof(no_start) / sizeof(no_start[0]); i++) if (cp == no_start[i]) return false;
+    return true;
+}
+
 int cv_wrap(FontId f, float size, float sp, const char *s, float x, float y, float w, float line_h, int max_lines,
             Color c, bool draw) {
     int lines = 0;
@@ -227,7 +241,7 @@ int cv_wrap(FontId f, float size, float sp, const char *s, float x, float y, flo
         /* fit: shrink to the last space that fits */
         while (n > 0 && gfx_text_width_sp(f, size, sp, p, n) > w) {
             int k = n - 1;
-            while (k > 0 && p[k] != ' ') k--;
+            while (k > 0 && p[k] != ' ' && !jp_break_before(p, k)) k--;
             if (k == 0) {   /* one long word: cut it */
                 n = gfx_text_fit(f, size, p, n, w);
                 if (n < 1) n = 1;
@@ -242,7 +256,11 @@ int cv_wrap(FontId f, float size, float sp, const char *s, float x, float y, flo
         buf[n] = 0;
         if (last && more_after) {
             /* make room for "..." */
-            while (n > 0 && gfx_text_width_sp(f, size, sp, buf, -1) + gfx_text_width_sp(f, size, sp, "...", -1) > w) buf[--n] = 0;
+            while (n > 0 && gfx_text_width_sp(f, size, sp, buf, -1) + gfx_text_width_sp(f, size, sp, "...", -1) > w) {
+                n--;
+                while (n > 0 && ((unsigned char)buf[n] & 0xC0) == 0x80) n--;   /* back to the start of the character */
+                buf[n] = 0;
+            }
             while (n > 0 && buf[n - 1] == ' ') buf[--n] = 0;
             strcat(buf, "...");
         }

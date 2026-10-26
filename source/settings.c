@@ -15,7 +15,7 @@ static const Key keys[] = {
     I("net.dhcp", dhcp, 0, 1), S("net.ip", ip), S("net.netmask", netmask), S("net.gateway", gateway),
     S("net.dns", dns), I("net.port", http_port, 1, 65535),
     I("display.video", video_mode, 0, 2), I("display.widescreen", widescreen, 0, 1),
-    I("display.full_width", full_width, 0, 1), I("display.margin", margin, 0, 12), I("display.intro", intro, 0, 1),
+    I("display.full_width", full_width, 0, 1), I("display.margin", margin, 0, 12), I("display.intro", intro, 0, 1), I("control.pointer_speed", pointer_speed, 1, 10),
     I("sound.menu", sounds, 0, 1), I("sound.volume", volume, 0, 10), I("sound.menu_music", menu_music, 0, 1),
     I("music.volume", music_volume, 0, 10),
     I("update.auto", update_auto, 0, 1), I("exit.action", exit_action, 0, 1), S("exit.dol", swiss_dol),
@@ -32,6 +32,7 @@ void settings_defaults(Settings *s) {
     s->full_width = 1;
     s->margin = 3;
     s->intro = 1;
+    s->pointer_speed = 4;
     s->sounds = 1;
     s->volume = 7;
     s->menu_music = 1;

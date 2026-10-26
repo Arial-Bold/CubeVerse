@@ -16,6 +16,7 @@
 #include "sound.h"
 #include "settings.h"
 #include "m3d.h"
+#include "intro_timing.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -326,7 +327,7 @@ static void draw_tris(const Model *m, int piece, const M34 *mx, float cx, float 
 }
 
 /* the inner walls of piece (ix, iy, iz), seen only while it flies */
-static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy, float al) {
+static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy, float al, float settle) {
     float lo[3], hi[3];
     int id[3] = { ix, iy, iz };
     for (int k = 0; k < 3; k++) {
@@ -340,11 +341,13 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
         int ax = nv[0] != 0 ? 0 : nv[1] != 0 ? 1 : 2;
         float plane = nv[ax] > 0 ? hi[ax] : lo[ax];
         if (fabsf(plane) > H - 0.01f) continue;   /* outside: the surface covers it */
-        /* the wall's extent along the other two axes, kept inside the rounding */
+        /* the wall's extent along the other two axes: the whole block while it
+         * flies (a solid cube), drawing in to the rounding as it lands */
+        float edge = lerpf(H, F, settle);
         float a0[3], a1[3];
         for (int k = 0; k < 3; k++) {
-            a0[k] = lo[k] <= -H + 0.01f ? -F : lo[k];
-            a1[k] = hi[k] >= H - 0.01f ? F : hi[k];
+            a0[k] = lo[k] <= -H + 0.01f ? -edge : lo[k];
+            a1[k] = hi[k] >= H - 0.01f ? edge : hi[k];
         }
         V3 c[4];
         int o1 = (ax + 1) % 3, o2 = (ax + 2) % 3;
@@ -358,13 +361,17 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
         Color col = lit(rgba(0xE4, 0xF1, 0xDC, 255), fd->n);
         col.a = (u8)(255 * al);
         Color c3[3] = { col, col, col };
+        /* wind it so it faces out of the piece, then draw it only if that side
+         * faces the viewer (a wall at the back would otherwise paint over the
+         * one at the front, and the piece would look hollow) */
+        V3 nrm = vcross(vadd(c[1], vmul(c[0], -1)), vadd(c[2], vmul(c[0], -1)));
+        if (vdot(nrm, fd->n) < 0) { V3 tmp = c[1]; c[1] = c[3]; c[3] = tmp; }
         V3 w[4];
         for (int k = 0; k < 4; k++) w[k] = xf(mx, c[k]);
-        /* either winding: draw whichever way faces the viewer */
+        if (!facing(w[0], w[1], w[2])) continue;
         int order[2][3] = { { 0, 1, 2 }, { 0, 2, 3 } };
         for (int tri = 0; tri < 2; tri++) {
             V3 A = w[order[tri][0]], B = w[order[tri][1]], C = w[order[tri][2]];
-            if (!facing(A, B, C)) { V3 tmp = B; B = C; C = tmp; }
             float p[9] = { A.x, A.y, A.z, B.x, B.y, B.z, C.x, C.y, C.z };
             gfx_tri3d(p, c3);
         }
@@ -374,7 +381,7 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
 
 /* ------------------------------------------------------------ the show */
 
-#define T_FLY 3.6f        /* each piece's flight */
+#define T_FLY INTRO_T_FLY /* each piece's flight */
 #define T_SPIN 2.8f       /* its spin is over by then */
 #define T_SOLID 5.6f      /* the last piece has landed */
 #define T_WORD_IN 5.9f
@@ -383,10 +390,10 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
 #define T_GLIDE_LEN 1.9f
 #define T_HOME 11.4f
 
-typedef struct { float fx, fy, fz, rx, ry, delay; } Flight;
+typedef IntroFlight Flight;
 static Flight flights[3][27];
 static float t;
-static bool start_played;
+static bool start_played, assemble_played;
 
 /* which home cube each logo cube becomes, where the logo cube sits, how it's turned */
 static const int TO_HOME[3] = { 0, 1, 3 };          /* middle -> Activity, right -> Communities, left -> My page */
@@ -395,7 +402,6 @@ static const float LX[3] = { 0, 116, -116 }, LY[3] = { -26, 10, 10 }, LS[3] = { 
 static const float LRZ[3] = { 0, 12, -14 };
 static const float THETA[3] = { 0, 90, 270 };
 
-static float frand(unsigned *s) { *s = *s * 1103515245u + 12345u; return ((*s >> 8) & 0xFFFF) / 65535.0f; }
 
 static void splash_enter(const char *arg, bool back) {
     (void)arg; (void)back;
@@ -403,22 +409,10 @@ static void splash_enter(const char *arg, bool back) {
         for (int i = 0; i < 3; i++) build_model(&model[i], EXPR[i]);
         built = true;
     }
-    unsigned seed = 11;
-    for (int c = 0; c < 3; c++)
-        for (int p = 0; p < 27; p++) {
-            int ix = p % 3, iy = (p / 3) % 3, iz = p / 9;
-            float x = (ix - 1) * 60.0f, y = (iy - 1) * 60.0f, z = (iz - 1) * 60.0f;
-            float n = sqrtf(x * x + y * y + z * z);
-            if (n < 1) n = 1;
-            float far = 1450 + 900 * frand(&seed);
-            Flight *f = &flights[c][p];
-            f->fx = x / n * far; f->fy = y / n * far; f->fz = z / n * far;
-            f->rx = (frand(&seed) * 2 - 1) * 540;
-            f->ry = (frand(&seed) * 2 - 1) * 540;
-            f->delay = 0.3f + (c == 0 ? 0.7f + 0.6f * frand(&seed) : 0.6f * frand(&seed));
-        }
+    intro_flights(&flights[0][0]);   /* (the same ones the sound is timed to) */
     t = 0;
     start_played = false;
+    assemble_played = false;
     if (!g_set.intro) t = T_GLIDE + T_GLIDE_LEN;   /* opening turned off: straight to the cubes settling */
 }
 
@@ -429,6 +423,9 @@ static void go_home(void) {
 
 static void splash_update(void) {
     t += g_dt;
+    /* the pieces' whoosh and clicks, from the very start (if it's made in time) */
+    if (!assemble_played && t < 0.6f && g_set.intro && sound_loaded(SFX_ASSEMBLE)) { assemble_played = true; sound_play(SFX_ASSEMBLE); }
+    if (t >= 0.6f) assemble_played = true;
     if (t > 0.3f && t < T_GLIDE && input_pressed(BTN_A | BTN_START | BTN_B)) t = T_GLIDE;   /* skip ahead */
     if (!start_played && t >= T_SOLID) {
         if (sound_loaded(SFX_START) || t > T_SOLID + 1.5f) { start_played = true; sound_play(SFX_START); }
@@ -483,7 +480,7 @@ static void splash_draw(float open) {
                 const Flight *f = &flights[c][p];
                 float lt = t - f->delay;
                 if (lt <= 0) continue;
-                float k = ease_bezier(clamp01(lt / T_FLY), 0.15f, 0.6f, 0.25f, 1);
+                float k = intro_progress(lt);
                 float sk = ease_bezier(clamp01(lt / T_SPIN), 0.2f, 0.5f, 0.3f, 1);
                 int ix = p % 3, iy = (p / 3) % 3, iz = p / 9;
                 V3 pc = v3((ix - 1) * 60.0f, (iy - 1) * 60.0f, (iz - 1) * 60.0f);
@@ -504,7 +501,8 @@ static void splash_draw(float open) {
                 int p = ord[i];
                 float lt = t - flights[c][p].delay;
                 float fade = clamp01(lt / 0.25f);
-                if (lt < T_FLY - 0.05f) draw_walls(p % 3, (p / 3) % 3, p / 9, &mats[p], ccx, ccy, fade);
+                float settle = clamp01((lt - (T_FLY - 0.6f)) / 0.55f);
+                if (lt < T_FLY - 0.05f) draw_walls(p % 3, (p / 3) % 3, p / 9, &mats[p], ccx, ccy, fade, settle);
                 draw_tris(&model[c], p, &mats[p], ccx, ccy, fade);
             }
         } else if (solid_a > 0) {

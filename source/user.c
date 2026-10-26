@@ -118,11 +118,11 @@ static void draw(float open) {
     cv_tabs(CV_L + 10, 96, TABS, 2, tab, ID_TAB, 1);
     pl_draw(&list, x, 130, w, CV_BOTTOM, 1);
     if (page.can_follow && !me) {
-        const char *h[] = { "S:Pointer", "LR:Tab", "X:Yeah!", "B:Back", "A:Open" };
-        ui_hints(h, 5, 1, input_stick_dir());
+        const char *h[] = { "S:Pointer", "LR:Tab", "B:Back", "A:Open" };
+        ui_hints(h, 4, 1, input_stick_dir());
     } else {
-        const char *h[] = { "S:Pointer", "LR:Tab", "X:Yeah!", "B:Back", "A:Open" };
-        ui_hints(h, 5, 1, input_stick_dir());
+        const char *h[] = { "S:Pointer", "LR:Tab", "B:Back", "A:Open" };
+        ui_hints(h, 4, 1, input_stick_dir());
     }
 }
 

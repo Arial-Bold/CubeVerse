@@ -65,8 +65,8 @@ static void draw(float open) {
     cv_title(title, CV_T_BLUE, right, 1);
     float x = cv_side(), w = UI_W - 2 * x;
     pl_draw(&list, x, 52, w, CV_BOTTOM, 1);
-    const char *h[] = { "S:Pointer", "X:Yeah!", "Y:Comment", "Z:Their page", "B:Back" };
-    ui_hints(h, 5, 1, input_stick_dir());
+    const char *h[] = { "S:Pointer", "Y:Comment", "B:Back" };
+    ui_hints(h, 3, 1, input_stick_dir());
 }
 
 const Screen screen_post = { enter, update, draw, NULL };

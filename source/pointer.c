@@ -1,6 +1,7 @@
 /* pointer.c - see pointer.h. The pointer is CubeBrowser's arrow, drawn
  * from shapes. */
 #include "pointer.h"
+#include "settings.h"
 #include "input.h"
 #include "sound.h"
 #include "gfx.h"
@@ -69,8 +70,10 @@ void ptr_update(void) {
     float sx = input_stick_x(), sy = input_stick_y();
     float m = sqrtf(sx * sx + sy * sy);
     if (m > 0.05f) {
-        /* gentle near the middle of the stick, fast at the edge */
-        float target = 120 + 520 * m * m;
+        /* gentle near the middle of the stick, fast at the edge, scaled by
+         * the Pointer speed setting (5 was the old speed; 4 the default) */
+        float k = 0.35f + 0.13f * g_set.pointer_speed;
+        float target = (120 + 520 * m * m) * k;
         speed += (target - speed) * clamp01(g_dt * 10);
         px += sx / m * speed * m * g_dt;
         py += sy / m * speed * m * g_dt;

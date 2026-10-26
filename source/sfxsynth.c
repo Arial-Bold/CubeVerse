@@ -6,6 +6,7 @@
  * moving between options is a short soft bell, confirming climbs an
  * arpeggio. Nothing is sampled. Also used by the PC preview tool. */
 #include "sfxsynth.h"
+#include "intro_timing.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,20 +56,26 @@ static const Tone center[] = { T(350, 350, .05f, .38f, 1.3f, .5f, 1), T(437, 437
 /* opening a side: a bright shimmer that settles lower */
 static const Tone openm[] = { T(668, 640, 0, .15f, .9f, .45f, 1), T(750, 720, .02f, .16f, .9f, .4f, 1), T(556, 540, .1f, .2f, 1.0f, .4f, 1),
                               T(445, 440, .35f, .15f, .8f, .35f, 1) };
-/* start: a bright, bouncy flourish - a D chord, a run of little bells
- * skipping upwards, a quick lift to G and a big shimmering D to finish */
+/* start (the logo is whole, then glides into the home cubes), in F like the
+ * menu music: a warm low chord as the pieces lock together; three little
+ * bells, one for each cube's face; a soft glassy F major 9 that shimmers in
+ * under the name; and, as the cubes glide away to the home screen, a breath
+ * of air with a run of bells climbing up */
 static const Tone start[] = {
-    T(146.8f, 146.8f, 0, .02f, 1.0f, .40f, 1), T(293.7f, 293.7f, 0, .01f, 1.0f, .42f, 1), T(370.0f, 370.0f, 0, .01f, .9f, .36f, 1),
-    T(440.0f, 440.0f, 0, .01f, .9f, .36f, 1), T(659.3f, 659.3f, 0, .005f, .7f, .26f, 2),
-    T(880.0f, 880.0f, .10f, .003f, .45f, .34f, 2), T(1174.7f, 1174.7f, .19f, .003f, .45f, .32f, 2),
-    T(1318.5f, 1318.5f, .28f, .003f, .45f, .30f, 2), T(1480.0f, 1480.0f, .37f, .003f, .45f, .30f, 2),
-    T(1760.0f, 1760.0f, .46f, .003f, .8f, .30f, 2), T(1480.0f, 1480.0f, .60f, .003f, .4f, .24f, 2),
-    T(1318.5f, 1318.5f, .69f, .003f, .4f, .22f, 2), T(1760.0f, 1760.0f, .78f, .003f, .7f, .26f, 2),
-    T(392.0f, 392.0f, .92f, .01f, .5f, .30f, 1), T(493.9f, 493.9f, .92f, .01f, .5f, .28f, 1), T(587.3f, 587.3f, .92f, .01f, .5f, .26f, 1),
-    T(740.0f, 740.0f, .92f, .005f, .45f, .20f, 2),
-    T(146.8f, 146.8f, 1.30f, .02f, 2.2f, .42f, 1), T(293.7f, 293.7f, 1.30f, .01f, 2.0f, .40f, 1), T(440.0f, 440.0f, 1.30f, .01f, 2.0f, .34f, 1),
-    T(554.4f, 554.4f, 1.30f, .01f, 1.9f, .28f, 1), T(659.3f, 659.3f, 1.30f, .005f, 1.8f, .26f, 2), T(740.0f, 740.0f, 1.30f, .005f, 1.8f, .24f, 2),
-    T(1760.0f, 1760.0f, 1.36f, .003f, 1.2f, .20f, 2), T(2349.3f, 2349.3f, 1.48f, .003f, 1.0f, .10f, 2),
+    /* the lock */
+    T(87.3f, 87.3f, 0, .012f, .9f, .42f, 1), T(174.6f, 174.6f, 0, .008f, .9f, .40f, 1), T(261.6f, 261.6f, 0, .008f, .7f, .26f, 1),
+    /* the three faces */
+    T(880.0f, 880.0f, .14f, .003f, .55f, .30f, 2), T(1046.5f, 1046.5f, .26f, .003f, .55f, .28f, 2),
+    T(1396.9f, 1396.9f, .38f, .003f, .8f, .28f, 2),
+    /* the name: a soft F major 9 */
+    T(174.6f, 174.6f, .32f, .55f, 2.3f, .26f, 1), T(220.0f, 220.0f, .36f, .55f, 2.3f, .24f, 1), T(261.6f, 261.6f, .40f, .55f, 2.2f, .22f, 1),
+    T(329.6f, 329.6f, .44f, .55f, 2.2f, .20f, 1), T(392.0f, 392.0f, .48f, .55f, 2.1f, .18f, 1),
+    T(2093.0f, 2093.0f, .70f, .003f, .9f, .08f, 2), T(1760.0f, 1760.0f, 1.05f, .003f, .9f, .06f, 2),
+    /* the glide: bells climbing (C F A C F) over a breath of air */
+    T(523.3f, 523.3f, 3.05f, .004f, .7f, .20f, 2), T(698.5f, 698.5f, 3.15f, .004f, .7f, .20f, 2),
+    T(880.0f, 880.0f, 3.25f, .004f, .7f, .20f, 2), T(1046.5f, 1046.5f, 3.35f, .004f, .8f, .20f, 2),
+    T(1396.9f, 1396.9f, 3.45f, .004f, 1.2f, .22f, 2),
+    T(349.2f, 349.2f, 3.45f, .25f, 1.4f, .16f, 1), T(440.0f, 440.0f, 3.45f, .25f, 1.4f, .14f, 1), T(523.3f, 523.3f, 3.45f, .25f, 1.4f, .12f, 1),
 };
 static const Tone close_[] = { T(450, 330, 0, .01f, .3f, .5f, 2), T(300, 260, .05f, .02f, .3f, .3f, 0) };
 static const Tone err[] = { T(220, 214, 0, .01f, .22f, .6f, 1), T(196, 190, .12f, .01f, .3f, .6f, 1) };
@@ -87,7 +94,7 @@ static const Recipe recipes[SFX_COUNT] = {
     [SFX_TURN_SIDE] = { side, N(side), { 0, .14f, .7f, .3f, 700, 1600 }, 1.7f, .35f, .62f },
     [SFX_TURN_CENTER] = { center, N(center), { 0, .14f, .7f, .3f, 800, 1800 }, 1.8f, .35f, .62f },
     [SFX_OPEN] = { openm, N(openm), { 0, .06f, .4f, .15f, 2500, 1200 }, 1.4f, .32f, .6f },
-    [SFX_START] = { start, N(start), { 0, .35f, .9f, .10f, 900, 4500 }, 3.6f, .3f, .66f },
+    [SFX_START] = { start, N(start), { 2.85f, .45f, 1.1f, .11f, 700, 3200 }, 5.4f, .32f, .62f },
     [SFX_CLOSE] = { close_, N(close_), { 0, .01f, .1f, .06f, 2500, 1500 }, .5f, .22f, .5f },
     [SFX_ERROR] = { err, N(err), { 0, 0, 0, 0, 1000, 1000 }, .55f, .15f, .55f },
     [SFX_KEY] = { key, N(key), { 0, 0, 0, 0, 1000, 1000 }, .15f, .1f, .35f },
@@ -154,15 +161,90 @@ static float ap_run(Allpass *a, float x) {
     return y;
 }
 
+#define ASSEMBLE_LEN 5.8f
+
 int sfx_length(int id) {
+    if (id == SFX_ASSEMBLE) return (int)(ASSEMBLE_LEN * SFX_RATE);
     if (id < 0 || id >= SFX_COUNT || !recipes[id].tones) return 0;
     return (int)(recipes[id].length * SFX_RATE);
 }
 
+/* The opening: a soft whoosh that swells as the pieces fly in, and a small
+ * wooden "tok" as each of them lands, at the moment it lands (the flights
+ * are the animation's own, intro_timing.h), each a little higher as the
+ * logo fills in. Everything quiet: the start chime (SFX_START) follows. */
+static bool render_assemble(int16_t *out, int n) {
+    float *mix = calloc((size_t)n, sizeof(float));
+    if (!mix) return false;
+    rng = 4242u;
+    /* the whoosh: noise through a band that rises */
+    float lp1 = 0, lp2 = 0, hp = 0;
+    for (int i = 0; i < n; i++) {
+        float s = (float)i / SFX_RATE;
+        float up = s < 0.3f ? 0 : s < 2.6f ? (s - 0.3f) / 2.3f : 1;
+        float down = s < 3.9f ? 1 : s > 5.3f ? 0 : 1 - (s - 3.9f) / 1.4f;
+        float e = up * up * (3 - 2 * up) * down * down;
+        if (e <= 0) continue;
+        float fc = 260 + 900 * up;
+        float a = 1 - expf(-2.0f * (float)M_PI * fc / SFX_RATE);
+        float x = noise();
+        lp1 += (x - lp1) * a;
+        lp2 += (lp1 - lp2) * a;
+        hp += (lp2 - hp) * 0.02f;
+        mix[i] += (lp2 - hp) * e * 0.55f;
+    }
+    /* the clicks */
+    IntroFlight fl[81];
+    intro_flights(fl);
+    float first = 1e9f, last = 0, when[81];
+    for (int k = 0; k < 81; k++) {
+        when[k] = -1;
+        if (k % 27 == 13) continue;   /* the hidden middle piece */
+        /* it touches down when it's all but there */
+        float lt = 0;
+        while (lt < INTRO_T_FLY && intro_progress(lt) < 0.985f) lt += 0.005f;
+        when[k] = fl[k].delay + lt;
+        if (when[k] < first) first = when[k];
+        if (when[k] > last) last = when[k];
+    }
+    for (int k = 0; k < 81; k++) {
+        if (when[k] < 0) continue;
+        float prog = last > first ? (when[k] - first) / (last - first) : 0;
+        float f = 620 + 520 * prog + 140 * (noise() * 0.5f + 0.5f);
+        float g = (0.09f + 0.04f * (noise() * 0.5f + 0.5f)) * (k / 27 == 0 ? 1.0f : 0.8f);
+        int i0 = (int)(when[k] * SFX_RATE), len = SFX_RATE / 12;
+        float ph = 0, tick = 1, body = 1;
+        const float tk = expf(-1.0f / (0.0035f * SFX_RATE)), bk = expf(-1.0f / (0.022f * SFX_RATE));
+        for (int j = 0; j < len && i0 + j < n; j++) {
+            ph += f / SFX_RATE;
+            float v = sine(ph) * body * 0.8f + sine(ph * 2.73f) * body * body * 0.25f + noise() * tick * 0.5f;
+            mix[i0 + j] += v * g;
+            tick *= tk;
+            body *= bk;
+        }
+    }
+    /* a little room, and out */
+    float peak = 0;
+    for (int i = 0; i < n; i++) {
+        if (i >= 1900) mix[i] += mix[i - 1900] * 0.22f;
+        if (i >= 3100) mix[i] += mix[i - 3100] * 0.12f;
+        if (fabsf(mix[i]) > peak) peak = fabsf(mix[i]);
+    }
+    float k = peak > 0 ? 0.55f / peak : 1;
+    for (int i = 0; i < n; i++) {
+        float v = mix[i] * k;
+        if (i > n - 400) v *= (n - i) / 400.0f;   /* no click at the end */
+        out[i] = (int16_t)(v * 32767);
+    }
+    free(mix);
+    return true;
+}
+
 bool sfx_render(int id, int16_t *out, int n) {
-    if (id < 0 || id >= SFX_COUNT || !recipes[id].tones) return false;
     if (sine_tab[SINE_N / 4] == 0)
         for (int i = 0; i <= SINE_N; i++) sine_tab[i] = sinf(2.0f * (float)M_PI * i / SINE_N);
+    if (id == SFX_ASSEMBLE) return render_assemble(out, n);
+    if (id < 0 || id >= SFX_COUNT || !recipes[id].tones) return false;
     const Recipe *r = &recipes[id];
     float *mix = calloc((size_t)n, sizeof(float));
     if (!mix) return false;

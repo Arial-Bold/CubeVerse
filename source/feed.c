@@ -63,8 +63,8 @@ static void feed_draw(float open) {
     float x = cv_side(), w = UI_W - 2 * x;
     cv_tabs(CV_L + 10, 52, TABS, 3, tab, ID_TAB, 1);
     pl_draw(&list, x, 86, w, CV_BOTTOM, 1);
-    const char *h[] = { "S:Pointer", "LR:Tab", "X:Yeah!", "Z:Their page", "B:Back", "A:Open" };
-    ui_hints(h, 6, 1, input_stick_dir());
+    const char *h[] = { "S:Pointer", "LR:Tab", "B:Back", "A:Open" };
+    ui_hints(h, 4, 1, input_stick_dir());
 }
 
 const Screen screen_feed = { feed_enter, feed_update, feed_draw, NULL };

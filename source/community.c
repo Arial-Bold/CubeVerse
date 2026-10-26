@@ -110,8 +110,8 @@ static void draw(float open) {
     ui_text_fit_scroll(FONT_MENU, 12, 1.0f, x + 32, hy, bx - 12 - (x + 32), 22, rgba(0xdf, 0xe4, 0xee, 255), desc);
     cv_tabs(CV_L + 10, 80, TABS, 2, tab, ID_TAB, 1);
     pl_draw(&list, x, 114, w, CV_BOTTOM, 1);
-    const char *h[] = { "S:Pointer", "LR:Tab", "X:Yeah!", "Y:Post", "Z:Their page", "B:Back", "A:Open" };
-    ui_hints(h, 7, 1, input_stick_dir());
+    const char *h[] = { "S:Pointer", "LR:Tab", "Y:Post", "B:Back", "A:Open" };
+    ui_hints(h, 5, 1, input_stick_dir());
 }
 
 const Screen screen_community = { enter, update, draw, NULL };
