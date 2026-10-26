@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 static const char *names[SFX_COUNT] = { "move_1", "move_2", "move_3", "select", "confirm", "cancel", "back", "turn_side",
-                                        "turn_center", "open_side", "start", "close", "error", "key", "loaded" };
+                                        "turn_center", "open_side", "start", "close", "error", "key", "loaded", "assemble" };
 static void w32(FILE *f, unsigned v) { fputc(v & 255, f); fputc(v >> 8 & 255, f); fputc(v >> 16 & 255, f); fputc(v >> 24, f); }
 static void w16(FILE *f, unsigned v) { fputc(v & 255, f); fputc(v >> 8 & 255, f); }
 int main(int argc, char **argv) {

@@ -6,7 +6,7 @@ CFLAGS = -O1 -g -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-missi
 APP = $(filter-out $(SRC)/sound.c $(SRC)/conn.c $(SRC)/castore.c $(SRC)/gc_entropy.c $(SRC)/netio.c $(SRC)/https.c, $(wildcard $(SRC)/*.c))
 apptest: apptest.c gxemu.c pc_sound.c conn_pc.c $(APP)
 	gcc $(CFLAGS) -o $@ $^ -lm -lpthread
-parsetest: parsetest.c $(SRC)/jparse.c $(SRC)/html.c
+parsetest: parsetest.c $(SRC)/jparse.c $(SRC)/html.c $(SRC)/jfont.c $(SRC)/inflate.c
 	gcc $(CFLAGS) -o $@ $^
 sfxpreview: sfxpreview.c $(SRC)/sfxsynth.c $(SRC)/musicsynth.c
 	gcc $(CFLAGS) -o $@ $^ -lm
