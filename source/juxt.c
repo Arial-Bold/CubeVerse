@@ -1,5 +1,6 @@
 /* juxt.c - see juxt.h. One worker thread does all of Juxt's network work
  * in order, keeping one secure connection open to the Juxt server. */
+#include "strutil.h"
 #include "juxt.h"
 #include "web.h"
 #include "net.h"
@@ -100,7 +101,7 @@ static void set_cookie(const char *name, const char *value, bool remove_it) {
 
 static void on_cookie(void *ctx, const char *host, const char *sc) {
     (void)ctx;
-    if (!strcasestr(host, "pretendo")) return;
+    if (!str_find_nocase(host, "pretendo")) return;
     char name[48], value[600];
     size_t n = strcspn(sc, "=");
     if (!sc[n] || n >= sizeof(name)) return;
@@ -111,7 +112,7 @@ static void on_cookie(void *ctx, const char *host, const char *sc) {
     if (vl >= sizeof(value)) vl = sizeof(value) - 1;
     memcpy(value, v, vl);
     value[vl] = 0;
-    bool gone = !value[0] || strcasestr(sc, "Max-Age=0") || strcasestr(sc, "Expires=Thu, 01 Jan 1970");
+    bool gone = !value[0] || str_find_nocase(sc, "Max-Age=0") || str_find_nocase(sc, "Expires=Thu, 01 Jan 1970");
     set_cookie(name, value, gone);
 }
 

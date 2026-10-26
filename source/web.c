@@ -1,5 +1,6 @@
 /* web.c - see web.h. The reading of an answer (Content-Length or chunked)
  * is CubeVerse's https.c, extended to keep the connection open. */
+#include "strutil.h"
 #include "web.h"
 #include "version.h"
 #include <ctype.h>
@@ -173,7 +174,7 @@ static int attempt(WebClient *wc, WebSlot *sl, const char *head, size_t head_len
         else if (!strcasecmp(line, "transfer-encoding") && strstr(v, "chunked")) rd.chunked = true;
         else if (!strcasecmp(line, "location")) snprintf(r->location, sizeof(r->location), "%s", v);
         else if (!strcasecmp(line, "content-type")) snprintf(r->content_type, sizeof(r->content_type), "%s", v);
-        else if (!strcasecmp(line, "connection")) { if (strcasestr(v, "close")) keep = false; else if (strcasestr(v, "keep-alive")) keep = true; }
+        else if (!strcasecmp(line, "connection")) { if (str_find_nocase(v, "close")) keep = false; else if (str_find_nocase(v, "keep-alive")) keep = true; }
         else if (!strcasecmp(line, "set-cookie") && wc->on_cookie) wc->on_cookie(wc->cookie_ctx, sl->host, v);
     }
     if (rd.chunked) rd.remaining = -1;
