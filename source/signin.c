@@ -1,6 +1,7 @@
 /* signin.c - signing in with a Pretendo Network ID: type it with the
- * on-screen keyboard, or scan the QR code and type it on a phone. Only a
- * sign-in key (cookie) is kept on the SD card, never the password. */
+ * on-screen keyboard, or scan the QR code and type it on a phone. The ID
+ * and password are remembered on the SD card (see juxt.c) so CubeVerse can
+ * sign in again by itself; Sign out in Settings forgets them. */
 #include "app.h"
 #include "cvui.h"
 #include "keyboard.h"
@@ -42,6 +43,8 @@ static void enter(const char *arg, bool back) {
     (void)arg;
     if (back) return;
     pass[0] = 0;
+    /* the ID and password from last time, if they were saved */
+    juxt_saved_login(user, sizeof(user), pass, sizeof(pass));
     kbd_init(&kuser, user, sizeof(user));
     kbd_init(&kpass, pass, sizeof(pass));
     kuser.no_space = kpass.no_space = true;
@@ -70,12 +73,7 @@ static void signed_in(void) {
     char m[96];
     snprintf(m, sizeof(m), "Signed in as %s.", juxt_my_name());
     app_toast(m);
-    switch (g_home_section) {
-    case 0: app_swap(SCR_FEED, ""); break;
-    case 2: app_swap(SCR_NEWS, ""); break;
-    case 3: app_swap(SCR_USER, ""); break;
-    default: app_swap(SCR_COMMUNITIES, ""); break;
-    }
+    app_home(g_home_section);   /* back to the cubes, signed in */
 }
 
 static void update(void) {
@@ -122,13 +120,13 @@ static void update(void) {
 
 static void field_box(int id, const char *label, Kbd *k, float x, float y, float w, bool focused, bool mask) {
     ui_text(FONT_ROUND, 11, 0, x, y, 16, CV_INK2, label);
-    bool hot = ptr_hot(id, x, y + 18, w, 36);
-    kbd_draw_field(k, x, y + 18, w, 36, 15, focused, mask, 1);
-    if (hot && !focused) ui_gold_ring(x, y + 18, w, 36, 0.5f + 0.5f * sinf(g_time * 4), 1);
+    bool hot = ptr_hot(id, x, y + 18, w, 42);
+    kbd_draw_field(k, x, y + 18, w, 42, 16, focused, mask, 1);
+    if (hot && !focused) ui_gold_ring(x, y + 18, w, 42, 0.5f + 0.5f * sinf(g_time * 4), 1);
 }
 
 static void draw_qr(float x, float y, float size) {
-    gfx_rect(x - 1, y - 1, size + 2, size + 2, rgba(0xCB, 0xD3, 0xE6, 255));
+    gfx_rect(x - 2, y - 2, size + 4, size + 4, rgba(0xB4, 0xBD, 0xD2, 255));
     gfx_rect(x, y, size, size, rgba(255, 255, 255, 255));
     if (!qr_ok) { ui_spinner(x + size / 2, y + size / 2, 10, g_time, 1); return; }
     int n = qrcodegen_getSize(qr);
@@ -148,42 +146,45 @@ static void draw(float open) {
     ui_text(FONT_MENU, 15, 1.6f, CV_L + 16 + lw + 8, CV_TOP + 9, 15, CV_T_GREEN, "Welcome to CubeVerse");
     ui_text_right(FONT_MENU, 15, 1.6f, UI_W - CV_L - 16, CV_TOP + 9, 15, COL_SOFT, "Sign in");
     gfx_rect(CV_L + 10, CV_TOP + 31, UI_W - 2 * CV_L - 20, 1, rgba(200, 210, 230, 71));
-    float x = cv_side(), w = UI_W - 2 * x;
+    float x = CV_L + 18, w = UI_W - 2 * x;
     ui_text(FONT_MENU, 13, 1.0f, x, 56, 20, rgba(0xdf, 0xe4, 0xee, 255),
             "Sign in with your Pretendo Network ID to read and post on Juxt.");
-    float qw = 186, gap = 14, fw = w - qw - gap, cy = 84;
+    bool wide = UI_W > 700;
+    float qw = wide ? 250 : 200, gap = 16, fw = w - qw - gap, cy = 86;
     if (field < 0) {
-        /* the form */
-        float ch = 252;
+        /* the form, filling the screen down to the hints */
+        float ch = CV_BOTTOM - 6 - cy;
         cv_card(x, cy, fw, ch, false, 1);
-        ui_text(FONT_CUBE, 15, 0, x + 16, cy + 12, 20, CV_INK, "Type it here");
-        field_box(ID_USER, "Pretendo Network ID", &kuser, x + 16, cy + 40, fw - 32, false, false);
-        field_box(ID_PASS, "Password", &kpass, x + 16, cy + 98, fw - 32, false, true);
-        cv_wrap(FONT_ROUND, 11, 0, "Your password only goes to Pretendo. CubeVerse keeps a sign-in key on the SD card, never the password.",
-                x + 16, cy + 156, fw - 32, 16, 2, CV_INK2, true);
-        bool hg = ptr_hot(ID_GO, x + 16, cy + ch - 46, fw - 32, 34);
-        cv_pill(x + 16, cy + ch - 46, fw - 32, 34, "Sign in", CV_GREEN, rgba(255, 255, 255, 255), hg, 1);
+        ui_text(FONT_CUBE, 17, 0, x + 18, cy + 14, 22, CV_INK, "Type it here");
+        field_box(ID_USER, "Pretendo Network ID", &kuser, x + 18, cy + 52, fw - 36, false, false);
+        field_box(ID_PASS, "Password", &kpass, x + 18, cy + 124, fw - 36, false, true);
+        cv_wrap(FONT_ROUND, 12, 0, "Your password only goes to Pretendo. CubeVerse remembers it on the SD card so you stay signed in. Sign out in Settings to forget it.",
+                x + 18, cy + 196, fw - 36, 18, 3, CV_INK2, true);
+        bool hg = ptr_hot(ID_GO, x + 18, cy + ch - 62, fw - 36, 44);
+        cv_pill(x + 18, cy + ch - 62, fw - 36, 44, "Sign in", CV_GREEN, rgba(255, 255, 255, 255), hg, 1);
         /* the phone */
         float qx = x + fw + gap;
         cv_card(qx, cy, qw, ch, false, 1);
-        ui_text(FONT_CUBE, 15, 0, qx + 14, cy + 12, 20, CV_INK, "Or use your phone");
-        draw_qr(qx + qw / 2 - 56, cy + 40, 112);
+        ui_text(FONT_CUBE, 17, 0, qx + 16, cy + 14, 22, CV_INK, "Or use your phone");
+        float qs = qw - 64 > 170 ? 170 : qw - 64;
+        draw_qr(qx + qw / 2 - qs / 2, cy + 52, qs);
+        float ty = cy + 52 + qs + 16;
         if (net_state() == NET_UP) {
-            cv_wrap(FONT_ROUND, 11, 0, "Scan and sign in on your phone. Same Wi-Fi as the GameCube.", qx + 14, cy + 160, qw - 28, 15, 3, CV_INK2, true);
-            ui_text_center(FONT_ROUND, 12, 0, qx + qw / 2, cy + ch - 26, 18, rgba(0x1B, 0x6A, 0x99, 255), net_ip());
+            cv_wrap(FONT_ROUND, 12, 0, "Scan and sign in on your phone. Same Wi-Fi as the GameCube.", qx + 16, ty, qw - 32, 17, 3, CV_INK2, true);
+            ui_text_center(FONT_ROUND, 14, 0, qx + qw / 2, cy + ch - 36, 22, rgba(0x1B, 0x6A, 0x99, 255), net_ip());
         } else {
-            cv_wrap(FONT_ROUND, 11, 0, net_message(), qx + 14, cy + 160, qw - 28, 15, 4, CV_INK2, true);
+            cv_wrap(FONT_ROUND, 12, 0, net_message(), qx + 16, ty, qw - 32, 17, 4, CV_INK2, true);
         }
     } else {
         /* typing: the field on top, the keyboard under it */
-        float ch = 70;
+        float ch = 78;
         cv_card(x, cy, w, ch, false, 1);
-        if (field == 0) field_box(ID_USER, "Pretendo Network ID", &kuser, x + 16, cy + 8, w - 140, true, false);
-        else field_box(ID_PASS, "Password", &kpass, x + 16, cy + 8, w - 140, true, true);
-        bool hd = ptr_hot(ID_DONE, x + w - 112, cy + 26, 96, 36);
-        cv_pill(x + w - 112, cy + 26, 96, 36, field == 0 ? "Next" : "Sign in", field == 0 ? rgba(0x29, 0xA8, 0xE0, 255) : CV_GREEN,
+        if (field == 0) field_box(ID_USER, "Pretendo Network ID", &kuser, x + 16, cy + 8, w - 144, true, false);
+        else field_box(ID_PASS, "Password", &kpass, x + 16, cy + 8, w - 144, true, true);
+        bool hd = ptr_hot(ID_DONE, x + w - 116, cy + 26, 100, 42);
+        cv_pill(x + w - 116, cy + 26, 100, 42, field == 0 ? "Next" : "Sign in", field == 0 ? rgba(0x29, 0xA8, 0xE0, 255) : CV_GREEN,
                 rgba(255, 255, 255, 255), hd, 1);
-        float kw = w > 560 ? 560 : w;
+        float kw = w > 660 ? 660 : w;
         kbd_draw(field == 0 ? &kuser : &kpass, x + (w - kw) / 2, cy + ch + 18, kw, 40, 7, ID_KEYS, 1);
     }
     if (field >= 0) {

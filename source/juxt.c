@@ -32,6 +32,7 @@ typedef struct {
     char arg[256];
     JResult *res;
     char a[64], b[128];       /* user/password, community id / reply id */
+    char login_user[64], login_pass[128];   /* a sign-in: what was typed, saved once it works */
     char *text;               /* malloc'd */
     uint8_t *bits;            /* malloc'd 320x120 */
     int feeling;
@@ -65,6 +66,66 @@ static volatile bool signed_in;
 static char my_name[48], my_mii[200];
 static int my_pid;
 
+/* The Pretendo ID and password, remembered on the SD card so CubeVerse can
+ * sign in again by itself when Juxt's session runs out. They are scrambled
+ * so they can't be read at a glance, but anyone with the SD card and some
+ * know-how could recover them; Sign out in Settings deletes them. */
+static char saved_user[64], saved_pass[128];
+static const char SCRAMBLE[] = "CubeVerse-GameCube-Juxt";
+
+static void scramble(const char *in, char *hex, size_t cap) {
+    size_t n = 0;
+    for (size_t i = 0; in[i] && n + 3 < cap; i++) n += (size_t)snprintf(hex + n, cap - n, "%02x", (unsigned char)(in[i] ^ SCRAMBLE[i % (sizeof(SCRAMBLE) - 1)]));
+    hex[n] = 0;
+}
+
+static void unscramble(const char *hex, char *out, size_t cap) {
+    size_t i = 0;
+    while (hex[0] && hex[1] && i + 1 < cap) {
+        char b[3] = { hex[0], hex[1], 0 };
+        out[i] = (char)(strtol(b, NULL, 16) ^ SCRAMBLE[i % (sizeof(SCRAMBLE) - 1)]);
+        i++;
+        hex += 2;
+    }
+    out[i] = 0;
+}
+
+static void save_account(const char *user, const char *pass) {
+    char u[200], p[300], buf[600];
+    scramble(user, u, sizeof(u));
+    scramble(pass, p, sizeof(p));
+    int n = snprintf(buf, sizeof(buf), "# CubeVerse: your Pretendo Network ID, kept so CubeVerse can sign in again by itself.\n# Sign out in CubeVerse's Settings to delete it.\nuser=%s\npass=%s\n", u, p);
+    char path[300];
+    storage_path(path, sizeof(path), "account.ini");
+    storage_write_atomic(path, buf, (size_t)n);
+}
+
+static void load_account(void) {
+    char path[300];
+    storage_path(path, sizeof(path), "account.ini");
+    char *t = storage_read(path, NULL);
+    if (!t) return;
+    for (char *line = strtok(t, "\n"); line; line = strtok(NULL, "\n")) {
+        size_t l = strlen(line);
+        if (l && line[l - 1] == '\r') line[l - 1] = 0;
+        if (!strncmp(line, "user=", 5)) unscramble(line + 5, saved_user, sizeof(saved_user));
+        else if (!strncmp(line, "pass=", 5)) unscramble(line + 5, saved_pass, sizeof(saved_pass));
+    }
+    memset(t, 0, strlen(t));
+    free(t);
+}
+
+bool juxt_saved_login(char *user, size_t ucap, char *pass, size_t pcap) {
+    thr_lock(&clock_);
+    bool have = saved_user[0] && saved_pass[0];
+    if (have) {
+        snprintf(user, ucap, "%s", saved_user);
+        snprintf(pass, pcap, "%s", saved_pass);
+    }
+    thr_unlock(&clock_);
+    return have;
+}
+
 bool juxt_signed_in(void) { return signed_in; }
 const char *juxt_my_name(void) { return my_name; }
 int juxt_my_pid(void) { return my_pid; }
@@ -72,7 +133,7 @@ const char *juxt_my_mii(void) { return my_mii; }
 
 static void save_session(void) {
     char buf[8192];
-    int n = snprintf(buf, sizeof(buf), "# CubeVerse sign-in (Juxt cookies; no password is stored)\n");
+    int n = snprintf(buf, sizeof(buf), "# CubeVerse sign-in (Juxt cookies)\n");
     thr_lock(&clock_);
     for (int i = 0; i < NCOOK; i++)
         if (cookies[i].name[0] && n < (int)sizeof(buf) - 700)
@@ -339,6 +400,8 @@ static void do_signin(Job *j) {
     form_add(body, sizeof(body), "password", j->b);
     form_add(body, sizeof(body), "grant_type", "password");
     form_add(body, sizeof(body), "redirect", "/users/me");
+    snprintf(j->login_user, sizeof(j->login_user), "%s", j->a);
+    snprintf(j->login_pass, sizeof(j->login_pass), "%s", j->b);
     memset(j->b, 0, sizeof(j->b));
     WebResp r;
     bool ok = juxt_req("POST", "/login", "application/x-www-form-urlencoded", body, strlen(body), &r, j->err, sizeof(j->err));
@@ -500,7 +563,7 @@ static void do_post(Job *j, bool drawing) {
     web_resp_free(&r);
 }
 
-static void run(Job *j) {
+static void run_once(Job *j) {
     switch (j->type) {
     case J_PAGE: do_page(j, false); break;
     case J_MORE: do_page(j, true); break;
@@ -513,6 +576,30 @@ static void run(Job *j) {
     case J_POST_TEXT: do_post(j, false); break;
     case J_POST_DRAW: do_post(j, true); break;
     }
+}
+
+static void save_session(void);
+
+/* When Juxt says the session has run out, sign in again with the saved ID
+ * and password (once), then do the job again. */
+static void run(Job *j) {
+    run_once(j);
+    if (!j->signed_out || j->type == J_SIGNIN) return;
+    Job t;
+    memset(&t, 0, sizeof(t));
+    t.type = J_SIGNIN;
+    if (!juxt_saved_login(t.a, sizeof(t.a), t.b, sizeof(t.b))) return;
+    do_signin(&t);
+    memset(t.login_pass, 0, sizeof(t.login_pass));
+    if (!t.ok) return;
+    save_session();
+    free(j->out);
+    j->out = NULL;
+    j->ok = false;
+    j->signed_out = false;
+    j->err[0] = 0;
+    j->status = 0;
+    run_once(j);
 }
 
 static void *worker_main(void *arg) {
@@ -563,6 +650,7 @@ void juxt_init(void) {
     web_init(&wc);
     wc.on_cookie = on_cookie;
     load_session();
+    load_account();
     thr_create(&worker, worker_main, NULL, 96 * 1024, 55);
 }
 
@@ -624,9 +712,17 @@ static void apply(Job *j) {
             my_pid = j->count;
             signed_in = true;
             save_session();
+            if (j->type == J_SIGNIN && j->login_user[0] && j->login_pass[0]) {
+                thr_lock(&clock_);
+                snprintf(saved_user, sizeof(saved_user), "%s", j->login_user);
+                snprintf(saved_pass, sizeof(saved_pass), "%s", j->login_pass);
+                thr_unlock(&clock_);
+                save_account(j->login_user, j->login_pass);
+            }
         }
         r->state = j->ok ? JS_READY : JS_FAILED;
     }
+    memset(j->login_pass, 0, sizeof(j->login_pass));
     free(j->out);
     free(j->text);
     free(j->bits);
@@ -695,6 +791,13 @@ void juxt_check_session(JResult *r) {
 
 void juxt_sign_out(void) {
     forget_session();
+    thr_lock(&clock_);
+    memset(saved_user, 0, sizeof(saved_user));
+    memset(saved_pass, 0, sizeof(saved_pass));
+    thr_unlock(&clock_);
+    char path[300];
+    storage_path(path, sizeof(path), "account.ini");
+    remove(path);
     my_name[0] = my_mii[0] = 0;
     my_pid = 0;
 }

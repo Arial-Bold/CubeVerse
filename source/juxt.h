@@ -109,14 +109,17 @@ void juxt_shutdown(void);
 bool juxt_net_ready(void);
 const char *juxt_net_message(void);
 
-/* signing in: the session is kept on the SD card (cookies, never the password) */
+/* signing in: the session (cookies) and, so CubeVerse can sign in again
+ * by itself, the ID and password are kept on the SD card */
 bool juxt_signed_in(void);
 const char *juxt_my_name(void);
 int  juxt_my_pid(void);
 const char *juxt_my_mii(void);
 void juxt_sign_in(JResult *r, const char *username, const char *password);
 void juxt_check_session(JResult *r);     /* is the saved session still good? */
-void juxt_sign_out(void);
+void juxt_sign_out(void);              /* also forgets the saved ID and password */
+/* The saved Pretendo ID and password (kept after a good sign-in), if any. */
+bool juxt_saved_login(char *user, size_t ucap, char *pass, size_t pcap);
 
 /* pages */
 void juxt_load(JPage *pg, JPageKind kind, const char *arg);

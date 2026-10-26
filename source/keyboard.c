@@ -139,9 +139,9 @@ bool kbd_update(Kbd *k, int clicked, int id_base) {
 }
 
 void kbd_draw_field(const Kbd *k, float x, float y, float w, float h, float size, bool focused, bool mask, float al) {
-    gfx_rect(x - 1, y - 1, w + 2, h + 2, rgba(0, 0, 0, (u8)(0.4f * 255 * al)));
+    /* a solid 2-unit frame: 1-pixel lines can vanish when 16:9 is squeezed */
+    gfx_rect(x - 2, y - 2, w + 4, h + 4, focused ? rgba(0x29, 0xA8, 0xE0, (u8)(255 * al)) : rgba(0xA6, 0xB0, 0xC8, (u8)(255 * al)));
     gfx_rect(x, y, w, h, rgba(255, 255, 255, (u8)(255 * al)));
-    if (focused) gfx_rrect_outline(x, y, w, h, 0, 2, rgba(0x29, 0xA8, 0xE0, (u8)(255 * al)));
     char shown[256];
     int len = (int)strlen(k->buf);
     if (len > 250) len = 250;
