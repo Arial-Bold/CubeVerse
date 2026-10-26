@@ -1,12 +1,11 @@
-/* pointer.c - see pointer.h. The hand is drawn from shapes (the design's
- * pearl-white hand with a thick indigo outline), not a picture. */
+/* pointer.c - see pointer.h. The pointer is CubeBrowser's arrow, drawn
+ * from shapes. */
 #include "pointer.h"
 #include "input.h"
 #include "sound.h"
 #include "gfx.h"
 #include "ui.h"
 #include "m3d.h"
-#include "textures.h"
 #include <malloc.h>
 #include <math.h>
 #include <string.h>
@@ -22,9 +21,8 @@ static int over = -1, last_over = -1;
 static bool shown = true;
 static float cx0, cy0, cw, ch;  /* confinement */
 static float speed;
-static int style, pen_r;
-static GfxImage hand;
-static bool hand_ready, hand_ok;   /* 0 the hand, 1 the drawing pen (a ring the pen's size) */
+static int style, pen_r;      /* 0 the arrow, 1 the drawing pen (a ring the pen's size) */
+static float clampf_(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
 void ptr_pen(float radius) { style = 1; pen_r = (int)(radius * 100); }
 
@@ -149,21 +147,29 @@ void ptr_draw(float al) {
         gfx_rect(px + r + 2, py - 0.8f, 5, 1.6f, blue);
         return;
     }
-    /* the hand (textures.h), drawn at half its texture size so its edges stay smooth */
-    if (!hand_ready) {
-        hand_ready = true;
-        void *d = memalign(32, sizeof(HAND_TEX));
-        if (d) {
-            memcpy(d, HAND_TEX, sizeof(HAND_TEX));
-            hand_ok = gfx_image_init(&hand, d, HAND_W, HAND_H, HAND_TW, HAND_TH, GFX_RGB5A3);
-        }
+    /* CubeBrowser's arrow: a shadow, a purple outline, a white fill and a
+     * gold glint; it shrinks a little while A is held, rings gold over
+     * something it can press, and bobs gently when the stick is let go */
+    static float press, hover, idle;
+    float k = clampf_(g_dt * 12);
+    press += ((input_held(BTN_A) ? 1.0f : 0.0f) - press) * k;
+    hover += ((over >= 0 ? 1.0f : 0.0f) - hover) * clampf_(g_dt * 8);
+    idle = (fabsf(input_stick_x()) + fabsf(input_stick_y()) > 0.05f) ? 0 : idle + g_dt;
+    float x = px, y = py + (idle > 0.5f ? sinf(g_time * 3.0f) * 1.2f : 0);
+    float s = 1.0f - press * 0.15f;
+    Color gold = rgba(255, 214, 92, 255);
+    if (hover > 0.01f) {
+        float pulse = 0.5f + 0.5f * sinf(g_time * 6.0f);
+        gfx_circle(x, y, 9 + 3 * pulse, rgba(gold.r, gold.g, gold.b, (u8)(115 * hover * al)));
     }
-    float k = 0.46f;
-    float x = px - HAND_TIP_X * k, y = py - HAND_TIP_Y * k;
-    if (hand_ok) {
-        gfx_image_draw(&hand, x + 2, y + 3, HAND_W * k, HAND_H * k, rgba(0, 0, 0, (u8)(90 * al)));   /* shadow */
-        gfx_image_draw(&hand, x, y, HAND_W * k, HAND_H * k, rgba(255, 255, 255, (u8)(255 * al)));
-    } else {
-        gfx_circle(px, py, 4, rgba(255, 255, 255, (u8)(255 * al)));
+    for (int pass = 0; pass < 3; pass++) {
+        float ox = pass == 0 ? 3 : 0, oy = pass == 0 ? 4 : 0, grow = pass == 2 ? 0 : 2.2f;
+        Color c = pass == 0 ? rgba(8, 4, 30, (u8)(120 * al)) : pass == 1 ? rgba(70, 50, 160, (u8)(255 * al))
+                                                                         : rgba(255, 255, 255, (u8)(255 * al));
+        float bx = x + ox, by = y + oy;
+        gfx_tri(bx - grow * 0.6f, by - grow * 1.6f, bx - grow * 0.6f, by + (22 + grow * 1.4f) * s,
+                bx + (17 + grow * 1.7f) * s, by + (16 + grow * 0.6f) * s, c);
+        gfx_line(bx + 7 * s, by + 15 * s, bx + 12 * s, by + 26 * s, 5 + grow * 1.8f, c);
     }
+    gfx_tri(x + 3 * s, y + 5 * s, x + 3 * s, y + 13 * s, x + 8 * s, y + 11 * s, rgba(gold.r, gold.g, gold.b, (u8)(140 * al)));
 }

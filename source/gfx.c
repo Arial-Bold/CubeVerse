@@ -351,7 +351,20 @@ static void clip_rect(float x, float y, float w, float h, int *opx, int *opy, in
     *opx = px; *opy = py; *opw = pw; *oph = ph;
 }
 
+static int ss_cur = -1;                  /* the supersampled tile being drawn, or -1 */
+static int ss_ex, ss_ey, ss_ew, ss_eh;   /* its place on the screen (framebuffer pixels) */
+
 static void apply_scissor(int px, int py, int pw, int ph) {
+    if (ss_cur >= 0) {
+        /* drawing a tile at twice the size in the framebuffer's corner */
+        int x0 = (px - ss_ex) * 2, y0 = (py - ss_ey) * 2, x1 = x0 + pw * 2, y1 = y0 + ph * 2;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > ss_ew * 2) x1 = ss_ew * 2;
+        if (y1 > ss_eh * 2) y1 = ss_eh * 2;
+        GX_SetScissor(x0, y0, x1 > x0 ? x1 - x0 : 1, y1 > y0 ? y1 - y0 : 1);
+        return;
+    }
     int bx = 0, by = 0, bw = rmode->fbWidth, bh = rmode->efbHeight;
     if (base_w >= 0) { bx = base_x; by = base_y; bw = base_w; bh = base_h; }
     int x0 = px > bx ? px : bx, y0 = py > by ? py : by;
@@ -389,7 +402,8 @@ void gfx_set_clip(float x, float y, float w, float h) {
 }
 
 void gfx_clear_clip(void) {
-    if (base_w >= 0) apply_scissor(base_x, base_y, base_w, base_h);
+    if (ss_cur >= 0) GX_SetScissor(0, 0, ss_ew * 2, ss_eh * 2);
+    else if (base_w >= 0) apply_scissor(base_x, base_y, base_w, base_h);
     else GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
 }
 
@@ -472,14 +486,17 @@ static void mode_image_smooth(void) {
         GX_SetTevKColorSel(stage[i], GX_TEV_KCSEL_1_4);
         GX_SetTevColorIn(stage[i], GX_CC_ZERO, GX_CC_TEXC, GX_CC_KONST, i ? GX_CC_CPREV : GX_CC_ZERO);
         GX_SetTevColorOp(stage[i], GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-        GX_SetTevAlphaIn(stage[i], GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_RASA);
+        /* the picture's own see-through-ness, averaged the same way (the
+         * logo and other cut-out pictures need it; photos are solid) */
+        GX_SetTevKAlphaSel(stage[i], GX_TEV_KASEL_1_4);
+        GX_SetTevAlphaIn(stage[i], GX_CA_ZERO, GX_CA_TEXA, GX_CA_KONST, i ? GX_CA_APREV : GX_CA_ZERO);
         GX_SetTevAlphaOp(stage[i], GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
     }
     /* stage 4: times the vertex colour (tint and fade) */
     GX_SetTevOrder(GX_TEVSTAGE4, GX_TEXCOORDNULL, GX_TEXMAP_NULL, GX_COLOR0A0);
     GX_SetTevColorIn(GX_TEVSTAGE4, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
     GX_SetTevColorOp(GX_TEVSTAGE4, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-    GX_SetTevAlphaIn(GX_TEVSTAGE4, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_RASA);
+    GX_SetTevAlphaIn(GX_TEVSTAGE4, GX_CA_ZERO, GX_CA_APREV, GX_CA_RASA, GX_CA_ZERO);
     GX_SetTevAlphaOp(GX_TEVSTAGE4, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
     cur_font = -1;
 }
@@ -1040,6 +1057,148 @@ void gfx_image_draw_part(GfxImage *img, float x, float y, float w, float h,
 void gfx_image_draw(GfxImage *img, float x, float y, float w, float h, Color c) {
     if (!img->data) return;
     gfx_image_draw_part(img, x, y, w, h, 0, 0, img->w, img->h, c);
+}
+
+/* ---------------------------------------------------------- supersampling */
+
+/* Antialiasing for a part of the screen: each tile of it is drawn at twice
+ * the size in the framebuffer's top-left corner, then copied out to a
+ * texture at the normal size with the GPU's copy filter, which averages
+ * every 2x2 pixels (four samples a pixel). The tiles are drawn before the
+ * frame itself (each copy clears the corner again), then pasted in place. */
+#define SS_MAX 8
+#define SS_TW 320            /* the biggest tile: twice it fills the framebuffer */
+#define SS_TH 260
+typedef struct { int ex, ey, ew, eh; void *buf; size_t cap; GXTexObj obj; bool ok; } SsTile;
+static SsTile ss[SS_MAX];
+static int ss_n;
+
+static void efb_k(float *kx, float *ky, float *mx, float *my) {
+    *mx = vw * margin; *my = 480.0f * margin;
+    *kx = rmode->fbWidth / (vw + 2 * *mx);
+    *ky = rmode->efbHeight / (480.0f + 2 * *my);
+}
+
+int gfx_ss_plan(float x, float y, float w, float h) {
+    ss_n = 0;
+#ifdef PC_TEST
+    (void)x; (void)y; (void)w; (void)h;
+    return 0;                /* the PC test build has no framebuffer copies */
+#else
+    if (!isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h) || w <= 0 || h <= 0) return 0;
+    float kx, ky, mx, my;
+    efb_k(&kx, &ky, &mx, &my);
+    int x0 = (int)floorf((x + mx) * kx), y0 = (int)floorf((y + my) * ky);
+    int x1 = (int)ceilf((x + w + mx) * kx), y1 = (int)ceilf((y + h + my) * ky);
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > rmode->fbWidth) x1 = rmode->fbWidth;
+    if (y1 > rmode->efbHeight) y1 = rmode->efbHeight;
+    x0 &= ~3; y0 &= ~3;      /* on the 4-pixel grid */
+    x1 = (x1 + 3) & ~3; y1 = (y1 + 3) & ~3;
+    if (x1 - x0 < 8 || y1 - y0 < 8) return 0;
+    int nx = (x1 - x0 + SS_TW - 1) / SS_TW, ny = (y1 - y0 + SS_TH - 1) / SS_TH;
+    if (nx * ny > SS_MAX) return 0;
+    int tw = (((x1 - x0) + nx - 1) / nx + 3) & ~3, th = (((y1 - y0) + ny - 1) / ny + 3) & ~3;
+    for (int j = 0; j < ny; j++)
+        for (int i = 0; i < nx; i++) {
+            SsTile *t = &ss[ss_n];
+            t->ex = x0 + i * tw;
+            t->ey = y0 + j * th;
+            t->ew = x0 + (i + 1) * tw > x1 ? x1 - t->ex : tw;
+            t->eh = y0 + (j + 1) * th > y1 ? y1 - t->ey : th;
+            if (t->ew < 4 || t->eh < 4) continue;
+            size_t need = GX_GetTexBufferSize((u16)t->ew, (u16)t->eh, GX_TF_RGBA8, GX_FALSE, 0);
+            if (need > t->cap) {
+                free(t->buf);
+                t->buf = memalign(32, need);
+                t->cap = t->buf ? need : 0;
+            }
+            if (!t->buf) return ss_n = 0;
+            t->ok = false;
+            ss_n++;
+        }
+    return ss_n;
+#endif
+}
+
+void gfx_ss_begin(int i) {
+#ifndef PC_TEST
+    if (i < 0 || i >= ss_n) return;
+    SsTile *t = &ss[i];
+    float kx, ky, mx, my;
+    efb_k(&kx, &ky, &mx, &my);
+    /* this tile's part of the design area fills a framebuffer area twice its size */
+    float l = t->ex / kx - mx, r = (t->ex + t->ew) / kx - mx, top = t->ey / ky - my, bot = (t->ey + t->eh) / ky - my;
+    Mtx44 proj;
+    guOrtho(proj, top, bot, l, r, 0, 300);
+    GX_LoadProjectionMtx(proj, GX_ORTHOGRAPHIC);
+    GX_SetViewport(0, 0, t->ew * 2, t->eh * 2, 0, 1);
+    ss_cur = i;
+    ss_ex = t->ex; ss_ey = t->ey; ss_ew = t->ew; ss_eh = t->eh;
+    GX_SetScissor(0, 0, t->ew * 2, t->eh * 2);
+#else
+    (void)i;
+#endif
+}
+
+void gfx_ss_end(int i) {
+#ifndef PC_TEST
+    if (i < 0 || i >= ss_n || ss_cur != i) return;
+    SsTile *t = &ss[i];
+    p3d = false;
+    GX_SetCopyFilter(GX_FALSE, NULL, GX_FALSE, NULL);   /* no deflicker blur on the copy */
+    GX_SetTexCopySrc(0, 0, t->ew * 2, t->eh * 2);
+    GX_SetTexCopyDst((u16)t->ew, (u16)t->eh, GX_TF_RGBA8, GX_TRUE);   /* GX_TRUE: halve it, averaging 2x2 */
+    GX_CopyTex(t->buf, GX_TRUE);
+    GX_PixModeSync();
+    GX_SetCopyFilter(rmode->aa, rmode->sample_pattern, GX_TRUE, rmode->vfilter);
+    GX_InitTexObj(&t->obj, t->buf, (u16)t->ew, (u16)t->eh, GX_TF_RGBA8, GX_CLAMP, GX_CLAMP, GX_FALSE);
+    GX_InitTexObjLOD(&t->obj, GX_NEAR, GX_NEAR, 0.0f, 0.0f, 0.0f, GX_FALSE, GX_FALSE, GX_ANISO_1);
+    t->ok = true;
+    ss_cur = -1;
+#else
+    (void)i;
+#endif
+}
+
+void gfx_ss_finish(void) {
+#ifndef PC_TEST
+    ss_cur = -1;
+    float mx = vw * margin, my = 480.0f * margin;
+    Mtx44 proj;
+    guOrtho(proj, -my, 480 + my, -mx, vw + mx, 0, 300);
+    GX_LoadProjectionMtx(proj, GX_ORTHOGRAPHIC);
+    GX_SetViewport(0, 0, rmode->fbWidth, rmode->efbHeight, 0, 1);
+    gfx_clear_clip();
+    GX_InvalidateTexAll();   /* the tiles were just written */
+#endif
+}
+
+void gfx_ss_draw(float al) {
+#ifndef PC_TEST
+    if (al <= 0) return;
+    float kx, ky, mx, my;
+    efb_k(&kx, &ky, &mx, &my);
+    bool p = p3d;
+    p3d = false;
+    for (int i = 0; i < ss_n; i++) {
+        SsTile *t = &ss[i];
+        if (!t->ok) continue;
+        mode_image();
+        GX_LoadTexObj(&t->obj, GX_TEXMAP0);
+        float x0 = t->ex / kx - mx, y0 = t->ey / ky - my, x1 = (t->ex + t->ew) / kx - mx, y1 = (t->ey + t->eh) / ky - my;
+        BEGIN(GX_QUADS, 4);
+        vtx(x0, y0, rgba(255, 255, 255, (u8)(255 * al))); GX_TexCoord2f32(0, 0);
+        vtx(x1, y0, rgba(255, 255, 255, (u8)(255 * al))); GX_TexCoord2f32(1, 0);
+        vtx(x1, y1, rgba(255, 255, 255, (u8)(255 * al))); GX_TexCoord2f32(1, 1);
+        vtx(x0, y1, rgba(255, 255, 255, (u8)(255 * al))); GX_TexCoord2f32(0, 1);
+        GX_End();
+    }
+    p3d = p;
+#else
+    (void)al;
+#endif
 }
 
 /* --------------------------------------------------------------- patterns */

@@ -33,7 +33,7 @@ static const float WOB_PERIOD[4] = { 4.4f, 4.9f, 4.0f, 4.6f }, WOB_OFF[4] = { 0,
 static float ring;        /* where the ring has turned to (cube at the front, fractional while turning) */
 static int target;        /* the cube being turned to */
 static float turn_t = -1, turn_from;   /* time into the current turn (-1: not turning) */
-#define TURN_S 0.95f
+#define TURN_S 0.72f
 static float exit_armed_until;
 static float shown_t;     /* seconds on this screen */
 static bool from_splash;
@@ -150,9 +150,9 @@ void home_draw_header(float al) {
     float rx = gfx_width() - 22;
     if (juxt_signed_in()) {
         const char *nm = juxt_my_name();
-        float tw = gfx_text_width(FONT_ROUND, 13, nm, -1);
-        ui_text(FONT_ROUND, 13, 0, rx - tw, 22, 36, rgba(0xEE, 0xF0, 0xFF, (u8)(255 * al)), nm);
-        cv_face(juxt_my_mii(), nm, rx - tw - 9 - 28, 26, 28, al);
+        float tw = gfx_text_width(FONT_ROUND, 17, nm, -1);
+        ui_text(FONT_ROUND, 17, 0, rx - tw, 22, 36, rgba(0xEE, 0xF0, 0xFF, (u8)(255 * al)), nm);
+        cv_face(juxt_my_mii(), nm, rx - tw - 12 - 36, 22, 36, al);
     } else {
         ui_text_right(FONT_ROUND, 13, 0, rx, 22, 36, rgba(0xB9, 0xBE, 0xD6, (u8)(255 * al)), "Not signed in");
     }
@@ -211,11 +211,46 @@ void home_draw_hints(float al) {
     ui_hints(h, upd ? 5 : 4, al, d);
 }
 
+/* Antialiasing for the cubes (see gfx_ss_plan): the area they cover is
+ * drawn at twice the size and shrunk. It switches itself off for the rest of
+ * the session if the GameCube can't keep up (the turning would stutter). */
+static bool aa_on = true;
+static float aa_slow;
+
+static bool draw_cubes_smooth(float t) {
+    if (!aa_on) return false;
+    if (g_dt > 1.0f / 45) aa_slow += g_dt; else if (aa_slow > 0) aa_slow -= g_dt * 0.25f;
+    if (aa_slow > 1.5f) { aa_on = false; return false; }
+    float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+    for (int i = 0; i < 4; i++) {
+        VCube v;
+        home_cube_setup(&v, i, (i - ring) * 90, t);
+        float a, b, c, d;
+        vcube_bounds(&v, &a, &b, &c, &d);
+        if (a < x0) x0 = a;
+        if (b < y0) y0 = b;
+        if (c > x1) x1 = c;
+        if (d > y1) y1 = d;
+    }
+    int n = gfx_ss_plan(x0, y0, x1 - x0, y1 - y0);
+    if (n <= 0) return false;
+    for (int i = 0; i < n; i++) {
+        gfx_ss_begin(i);
+        cv_background(1);
+        home_draw_cubes(ring, t, 1, 0);
+        gfx_ss_end(i);
+    }
+    gfx_ss_finish();
+    return true;
+}
+
 static void home_draw(float open) {
     (void)open;
-    cv_background(1);
     float t = g_time;
-    home_draw_cubes(ring, t, 1, 0);
+    bool smooth = draw_cubes_smooth(t);   /* first: it uses the framebuffer's corner */
+    cv_background(1);
+    if (smooth) gfx_ss_draw(1);
+    else home_draw_cubes(ring, t, 1, 0);
     home_draw_header(1);
     home_draw_labels(ring, 1);
     float hints = settings_panel_active() || update_panel_active() ? 0 : 1;

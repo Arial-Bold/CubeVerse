@@ -31,6 +31,8 @@ typedef struct {
 
 void vcube_init(VCube *c);
 void vcube_draw(const VCube *c);
+/* Where the cube shows on the screen (with its glow). */
+void vcube_bounds(const VCube *c, float *x0, float *y0, float *x1, float *y1);
 /* The rotation (and scale) the cube is drawn with, about its middle. */
 M34  vcube_matrix(const VCube *c);
 /* Glass for small planes: kind 0 = tinted front glass, 1 = clear side glass. */

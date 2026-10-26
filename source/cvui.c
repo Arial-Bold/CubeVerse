@@ -50,8 +50,8 @@ void cv_background(float al) {
                 vxy[k * 2] = fx + fw * i / VC;
                 vxy[k * 2 + 1] = fy + fh * j / VR;
                 float d = sqrtf(u * u * 0.8f + v * v);   /* a little wider than tall */
-                float t = clamp01((d - 0.55f) / 0.75f);
-                vc[k] = rgba(0, 0, 0, (u8)(t * t * 0.85f * 255 * al));
+                float t = clamp01((d - 0.4f) / 0.7f);   /* black in the corners */
+                vc[k] = rgba(0, 0, 0, (u8)(powf(t, 1.5f) * 255 * al));
             }
         gfx_mesh(VC, VR, vxy, vc);
     }

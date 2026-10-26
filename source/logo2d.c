@@ -11,7 +11,10 @@
 static GfxImage tex;
 static bool tried, ok;
 
-float logo_mark_width(float h) { return h * LOGO_W / LOGO_H; }
+#define IW (LOGO_W - 2 * LOGO_PAD)   /* the picture inside the see-through border */
+#define IH (LOGO_H - 2 * LOGO_PAD)
+
+float logo_mark_width(float h) { return h * IW / IH; }
 
 void logo_mark_draw(float x, float y, float h, float al) {
     if (al <= 0) return;
@@ -23,5 +26,8 @@ void logo_mark_draw(float x, float y, float h, float al) {
             ok = gfx_image_init(&tex, d, LOGO_W, LOGO_H, LOGO_TW, LOGO_TH, GFX_RGB5A3);
         }
     }
-    if (ok) gfx_image_draw(&tex, x, y, logo_mark_width(h), h, rgba(255, 255, 255, (u8)(255 * al)));
+    if (!ok) return;
+    /* the quad takes in the border too, so the edges fade out cleanly */
+    float k = h / IH;
+    gfx_image_draw(&tex, x - LOGO_PAD * k, y - LOGO_PAD * k, LOGO_W * k, LOGO_H * k, rgba(255, 255, 255, (u8)(255 * al)));
 }

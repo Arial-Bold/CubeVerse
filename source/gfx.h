@@ -71,6 +71,17 @@ void gfx_clear_clip(void);
 /* A clip every other clip stays inside (a scrolling list); gfx_clear_clip
  * returns to it. */
 void gfx_set_base_clip(float x, float y, float w, float h);
+
+/* Antialiasing (supersampling) for part of the screen. Plan the area (it is
+ * split into tiles; returns how many, 0 if not possible), then for each tile:
+ * gfx_ss_begin(i), draw everything that shows there, gfx_ss_end(i). Then
+ * gfx_ss_finish(), and later in the frame gfx_ss_draw() pastes the tiles in.
+ * The tiles must all be drawn before anything else in the frame. */
+int  gfx_ss_plan(float x, float y, float w, float h);
+void gfx_ss_begin(int i);
+void gfx_ss_end(int i);
+void gfx_ss_finish(void);
+void gfx_ss_draw(float alpha);
 void gfx_clear_base_clip(void);
 
 void gfx_rect(float x, float y, float w, float h, Color c);
