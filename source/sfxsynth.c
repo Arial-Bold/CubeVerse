@@ -6,7 +6,7 @@
  * moving between options is a short soft bell, confirming climbs an
  * arpeggio. Nothing is sampled. Also used by the PC preview tool. */
 #include "sfxsynth.h"
-#include "intro_timing.h"
+#include "intro_clip.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,20 +57,15 @@ static const Tone center[] = { T(350, 350, .05f, .38f, 1.3f, .5f, 1), T(437, 437
 static const Tone openm[] = { T(668, 640, 0, .15f, .9f, .45f, 1), T(750, 720, .02f, .16f, .9f, .4f, 1), T(556, 540, .1f, .2f, 1.0f, .4f, 1),
                               T(445, 440, .35f, .15f, .8f, .35f, 1) };
 /* start (the logo is whole, then glides into the home cubes), in F like the
- * menu music: a warm low chord as the pieces lock together; three little
- * bells, one for each cube's face; a soft glassy F major 9 that shimmers in
- * under the name; and, as the cubes glide away to the home screen, a breath
- * of air with a run of bells climbing up */
+ * menu music. The moment the logo is whole has its sound in the opening's
+ * clip (the "boing"); this carries on from there: a soft glassy F major 9
+ * that shimmers in under the name and, as the cubes glide away to the home
+ * screen, a breath of air with a run of bells climbing up */
 static const Tone start[] = {
-    /* the lock */
-    T(87.3f, 87.3f, 0, .012f, .9f, .42f, 1), T(174.6f, 174.6f, 0, .008f, .9f, .40f, 1), T(261.6f, 261.6f, 0, .008f, .7f, .26f, 1),
-    /* the three faces */
-    T(880.0f, 880.0f, .14f, .003f, .55f, .30f, 2), T(1046.5f, 1046.5f, .26f, .003f, .55f, .28f, 2),
-    T(1396.9f, 1396.9f, .38f, .003f, .8f, .28f, 2),
     /* the name: a soft F major 9 */
     T(174.6f, 174.6f, .32f, .55f, 2.3f, .26f, 1), T(220.0f, 220.0f, .36f, .55f, 2.3f, .24f, 1), T(261.6f, 261.6f, .40f, .55f, 2.2f, .22f, 1),
     T(329.6f, 329.6f, .44f, .55f, 2.2f, .20f, 1), T(392.0f, 392.0f, .48f, .55f, 2.1f, .18f, 1),
-    T(2093.0f, 2093.0f, .70f, .003f, .9f, .08f, 2), T(1760.0f, 1760.0f, 1.05f, .003f, .9f, .06f, 2),
+    T(2093.0f, 2093.0f, .70f, .015f, .9f, .05f, 0), T(1760.0f, 1760.0f, 1.05f, .015f, .9f, .04f, 0),   /* soft, not shrill */
     /* the glide: bells climbing (C F A C F) over a breath of air */
     T(523.3f, 523.3f, 3.05f, .004f, .7f, .20f, 2), T(698.5f, 698.5f, 3.15f, .004f, .7f, .20f, 2),
     T(880.0f, 880.0f, 3.25f, .004f, .7f, .20f, 2), T(1046.5f, 1046.5f, 3.35f, .004f, .8f, .20f, 2),
@@ -161,82 +156,44 @@ static float ap_run(Allpass *a, float x) {
     return y;
 }
 
-#define ASSEMBLE_LEN 5.8f
-
 int sfx_length(int id) {
-    if (id == SFX_ASSEMBLE) return (int)(ASSEMBLE_LEN * SFX_RATE);
+    if (id == SFX_ASSEMBLE) return INTRO_CLIP_SAMPLES * 2;
     if (id < 0 || id >= SFX_COUNT || !recipes[id].tones) return 0;
     return (int)(recipes[id].length * SFX_RATE);
 }
 
-/* The opening: a soft whoosh that swells as the pieces fly in, and a small
- * wooden "tok" as each of them lands, at the moment it lands (the flights
- * are the animation's own, intro_timing.h), each a little higher as the
- * logo fills in. Everything quiet: the start chime (SFX_START) follows. */
+/* The opening (SFX_ASSEMBLE): a happy crowd getting busier as the pieces
+ * fly in, cheering as they land (with their clicks), a hush, and a soft
+ * "boing" into a chord when the logo is whole. It's a clip made beforehand
+ * (tools/sound/make_intro_clip.py: a crowd of voices is too much to make in
+ * the opening's first moment), kept as 4-bit IMA ADPCM at 16 kHz and
+ * unpacked here to the sounds' 32 kHz. */
 static bool render_assemble(int16_t *out, int n) {
-    float *mix = calloc((size_t)n, sizeof(float));
-    if (!mix) return false;
-    rng = 4242u;
-    /* the whoosh: noise through a band that rises */
-    float lp1 = 0, lp2 = 0, hp = 0;
-    for (int i = 0; i < n; i++) {
-        float s = (float)i / SFX_RATE;
-        float up = s < 0.3f ? 0 : s < 2.6f ? (s - 0.3f) / 2.3f : 1;
-        float down = s < 3.9f ? 1 : s > 5.3f ? 0 : 1 - (s - 3.9f) / 1.4f;
-        float e = up * up * (3 - 2 * up) * down * down;
-        if (e <= 0) continue;
-        float fc = 260 + 900 * up;
-        float a = 1 - expf(-2.0f * (float)M_PI * fc / SFX_RATE);
-        float x = noise();
-        lp1 += (x - lp1) * a;
-        lp2 += (lp1 - lp2) * a;
-        hp += (lp2 - hp) * 0.02f;
-        mix[i] += (lp2 - hp) * e * 0.55f;
+    static const int16_t step_tab[89] = {
+        7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107,
+        118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963,
+        1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894,
+        6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794,
+        32767 };
+    static const int8_t idx_tab[16] = { -1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8 };
+    int pred = 0, idx = 0, prev = 0;
+    for (int i = 0; i < INTRO_CLIP_SAMPLES; i++) {
+        int code = (INTRO_CLIP[i >> 1] >> ((i & 1) * 4)) & 15;
+        int step = step_tab[idx], d = step >> 3;
+        if (code & 4) d += step;
+        if (code & 2) d += step >> 1;
+        if (code & 1) d += step >> 2;
+        pred += (code & 8) ? -d : d;
+        if (pred > 32767) pred = 32767;
+        if (pred < -32768) pred = -32768;
+        idx += idx_tab[code];
+        if (idx < 0) idx = 0;
+        if (idx > 88) idx = 88;
+        /* 16 kHz to 32 kHz: this sample, and halfway from the last one */
+        if (2 * i < n) out[2 * i] = (int16_t)((prev + pred) / 2);
+        if (2 * i + 1 < n) out[2 * i + 1] = (int16_t)pred;
+        prev = pred;
     }
-    /* the clicks */
-    IntroFlight fl[81];
-    intro_flights(fl);
-    float first = 1e9f, last = 0, when[81];
-    for (int k = 0; k < 81; k++) {
-        when[k] = -1;
-        if (k % 27 == 13) continue;   /* the hidden middle piece */
-        /* it touches down when it's all but there */
-        float lt = 0;
-        while (lt < INTRO_T_FLY && intro_progress(lt) < 0.985f) lt += 0.005f;
-        when[k] = fl[k].delay + lt;
-        if (when[k] < first) first = when[k];
-        if (when[k] > last) last = when[k];
-    }
-    for (int k = 0; k < 81; k++) {
-        if (when[k] < 0) continue;
-        float prog = last > first ? (when[k] - first) / (last - first) : 0;
-        float f = 620 + 520 * prog + 140 * (noise() * 0.5f + 0.5f);
-        float g = (0.09f + 0.04f * (noise() * 0.5f + 0.5f)) * (k / 27 == 0 ? 1.0f : 0.8f);
-        int i0 = (int)(when[k] * SFX_RATE), len = SFX_RATE / 12;
-        float ph = 0, tick = 1, body = 1;
-        const float tk = expf(-1.0f / (0.0035f * SFX_RATE)), bk = expf(-1.0f / (0.022f * SFX_RATE));
-        for (int j = 0; j < len && i0 + j < n; j++) {
-            ph += f / SFX_RATE;
-            float v = sine(ph) * body * 0.8f + sine(ph * 2.73f) * body * body * 0.25f + noise() * tick * 0.5f;
-            mix[i0 + j] += v * g;
-            tick *= tk;
-            body *= bk;
-        }
-    }
-    /* a little room, and out */
-    float peak = 0;
-    for (int i = 0; i < n; i++) {
-        if (i >= 1900) mix[i] += mix[i - 1900] * 0.22f;
-        if (i >= 3100) mix[i] += mix[i - 3100] * 0.12f;
-        if (fabsf(mix[i]) > peak) peak = fabsf(mix[i]);
-    }
-    float k = peak > 0 ? 0.55f / peak : 1;
-    for (int i = 0; i < n; i++) {
-        float v = mix[i] * k;
-        if (i > n - 400) v *= (n - i) / 400.0f;   /* no click at the end */
-        out[i] = (int16_t)(v * 32767);
-    }
-    free(mix);
     return true;
 }
 
