@@ -1,15 +1,15 @@
 /* musicsynth.c - see musicsynth.h.
  *
- * The piece is CubeVerse's own: a light, bouncy tune in F major at 116
+ * The piece is CubeVerse's own: a light, mellow tune in F major at 98
  * beats a minute, in the spirit of a cheerful menu theme. Two bars of intro,
  * then A (eight bars), A again with the whistle, B (eight bars, a gentler
- * middle) and A once more, about 70 seconds; then it goes round again from
+ * middle) and A once more, about 80 seconds; then it goes round again from
  * the first A. The sounds:
- *  - a round, short bass that skips between root, octave and fifth;
+ *  - a round, warm bass that steps between root, octave and fifth;
  *  - an electric piano playing the chords on the off-beats;
  *  - a marimba with the tune (and, under the whistle, little arpeggios);
  *  - a soft whistle;
- *  - a shaker, a finger snap and a soft kick;
+ *  - a quiet shaker, a soft snap and a gentle kick;
  *  - a small room and a little echo.
  * Nothing is sampled; every sound is made here, sample by sample. */
 #include "musicsynth.h"
@@ -79,7 +79,7 @@ enum { SEC_INTRO, SEC_A, SEC_A2, SEC_B, SEC_A3 };
 #define INTRO_BARS 2
 #define SONG_BARS (INTRO_BARS + 32)
 #define LOOP_BAR INTRO_BARS
-#define STEP_SECONDS (60.0 / 116.0 / 4.0)   /* sixteenth notes at 116 bpm */
+#define STEP_SECONDS (60.0 / 98.0 / 4.0)   /* sixteenth notes at 98 bpm */
 
 static int section_of(int bar, int *in) {
     if (bar < INTRO_BARS) { *in = bar; return SEC_INTRO; }
@@ -181,35 +181,35 @@ static void play_bass(int note, float len, float vel) {
 }
 
 static void play_ep(int note, float len, float vel, float p) {
-    Voice *x = voice(V_EP, mtof((float)note), 0.003f, 0.9f, 0.09f, len, 0.055f * vel, p);
+    Voice *x = voice(V_EP, mtof((float)note), 0.006f, 1.1f, 0.3f, len, 0.055f * vel, p);
     if (!x) return;
     x->inc2 = x->inc;                       /* 1:1 FM: a soft electric piano */
-    x->idx = 1.5f * vel;
+    x->idx = 0.9f * vel;
     x->idx_k = decay_k(0.25f);
 }
 
 static void play_mallet(int note, float vel, float p) {
-    Voice *x = voice(V_MALLET, mtof((float)note), 0.002f, 0.45f, 0.45f, 64, 0.12f * vel, p);
+    Voice *x = voice(V_MALLET, mtof((float)note), 0.004f, 0.7f, 0.7f, 64, 0.11f * vel, p);
     if (!x) return;
     x->inc2 = phase_inc(mtof((float)note) * 3.93f);   /* the bar's bright overtone */
-    x->idx = 0.55f;
+    x->idx = 0.28f;
     x->idx_k = decay_k(0.05f);
 }
 
 static void play_whistle(int note, float len, float vel, float p) {
-    Voice *x = voice(V_WHISTLE, mtof((float)note), 0.045f, 0, 0.12f, len, 0.085f * vel, p);
+    Voice *x = voice(V_WHISTLE, mtof((float)note), 0.08f, 0, 0.2f, len, 0.068f * vel, p);
     if (!x) return;
     x->inc2 = phase_inc(5.4f);              /* vibrato */
     x->idx = 0;                             /* the vibrato grows in */
 }
 
 static void play_kick(float vel) {
-    Voice *x = voice(V_KICK, 150, 0.001f, 0.16f, 0.16f, 64, 0.17f * vel, 0);
+    Voice *x = voice(V_KICK, 120, 0.002f, 0.14f, 0.14f, 64, 0.09f * vel, 0);
     if (x) x->idx = 1;                      /* the pitch drop */
 }
 
-static void play_snap(float vel) { voice(V_SNAP, 1900, 0.0005f, 0.05f, 0.05f, 64, 0.30f * vel, 0.15f); }
-static void play_shaker(float vel, float p) { voice(V_SHAKER, 0, 0.004f, 0.035f, 0.035f, 64, 0.13f * vel, p); }
+static void play_snap(float vel) { voice(V_SNAP, 1900, 0.001f, 0.04f, 0.04f, 64, 0.15f * vel, 0.15f); }
+static void play_shaker(float vel, float p) { voice(V_SHAKER, 0, 0.008f, 0.045f, 0.045f, 64, 0.075f * vel, p); }
 
 /* ---------------------------------------------------------------- effects */
 
@@ -218,7 +218,7 @@ typedef struct { float *buf; int len, pos; } Allpass;
 static float rv_mem[2][4 * 700 + 2 * 340];
 static Comb combs[2][4];
 static Allpass aps[2][2];
-#define DELAY_LEN ((int)(MS_RATE * 60.0 / 116.0 * 0.75))   /* a dotted eighth */
+#define DELAY_LEN ((int)(MS_RATE * 60.0 / 98.0 * 0.75))   /* a dotted eighth */
 static float dly[2][MS_RATE / 2];
 static int dly_pos;
 static float dly_lp[2];
@@ -245,7 +245,7 @@ static void fx_init(void) {
 static inline float comb(Comb *c, float x) {
     float y = c->buf[c->pos];
     c->lp = y * 0.55f + c->lp * 0.45f;
-    c->buf[c->pos] = x + c->lp * 0.78f;
+    c->buf[c->pos] = x + c->lp * 0.82f;
     if (++c->pos >= c->len) c->pos = 0;
     return y;
 }
@@ -260,6 +260,7 @@ static inline float allpass(Allpass *a, float x) {
 
 static long step;             /* the next sixteenth to play */
 static double to_step;        /* samples until it */
+static float mlp_l, mlp_r;    /* the low-pass over everything */
 
 void ms_reset(void) {
     if (!tabs_ready) make_tables();
@@ -269,13 +270,14 @@ void ms_reset(void) {
     to_step = 0;
     rng = 1234567;
     step_len = STEP_SECONDS * RATE;
+    mlp_l = mlp_r = 0;
 }
 
 /* the bass in half a bar: root, octave skip, fifth, and a lead-in to the next chord */
 static void bass_half(int root, int next_root, int pos, bool lead_in) {
     switch (pos) {
     case 0: play_bass(root, 2.5f, 1.0f); break;
-    case 3: play_bass(root + 12, 0.8f, 0.6f); break;
+    case 3: play_bass(root + 12, 0.8f, 0.35f); break;
     case 4: play_bass(root + 7, 1.6f, 0.85f); break;
     case 6:
         if (lead_in) {
@@ -315,7 +317,7 @@ static void play_step(long s) {
     } else if (ep_at[pos]) {
         float vel = ep_at[pos] == 1 ? 0.9f : ep_at[pos] == 2 ? 0.55f : 0.7f;
         if (sec == SEC_B) vel *= 0.7f;
-        for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 1.4f, vel * (k == 3 ? 0.85f : 1), k * 0.3f - 0.45f);
+        for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 2.5f, vel * (k == 3 ? 0.85f : 1), k * 0.3f - 0.45f);
     }
 
     /* the tune */
@@ -344,10 +346,9 @@ static void play_step(long s) {
 
     /* percussion */
     bool drums = sec != SEC_INTRO;
-    float shake = (pos & 1) ? 0.45f : (pos & 2) ? 0.9f : 0.6f;
-    play_shaker(shake * (0.85f + 0.3f * frand()), (pos & 2) ? 0.35f : 0.2f);
+    if (!(pos & 1)) play_shaker(((pos & 2) ? 0.9f : 0.55f) * (0.85f + 0.3f * frand()), (pos & 2) ? 0.35f : 0.2f);   /* eighths only */
     if (drums) {
-        if (pos == 0 || pos == 8 || (pos == 11 && (in & 1))) play_kick(pos == 11 ? 0.6f : 1);
+        if (pos == 0 || pos == 8) play_kick(pos == 8 ? 0.6f : 1);
         if (pos == 4 || pos == 12) play_snap(sec == SEC_B ? 0.7f : 1);
         /* a fill into the last A */
         if (sec == SEC_B && in == 7 && (pos == 13 || pos == 14 || pos == 15)) play_snap(0.55f + 0.15f * (pos - 13));
@@ -404,7 +405,7 @@ void ms_render(int16_t *out, int frames, float gain) {
             case V_BASS:
                 for (int i = 0; i < n; i++) {
                     float e = envelope(x) * g;
-                    float s = sin_t[x->ph >> TSHIFT] + 0.3f * sin_t[(x->ph << 1) >> TSHIFT] + 0.08f * sin_t[(x->ph * 3) >> TSHIFT];
+                    float s = sin_t[x->ph >> TSHIFT] + 0.15f * sin_t[(x->ph << 1) >> TSHIFT] + 0.03f * sin_t[(x->ph * 3) >> TSHIFT];
                     x->ph += x->inc;
                     s *= e;
                     dryL[i] += s;
@@ -420,7 +421,7 @@ void ms_render(int16_t *out, int frames, float gain) {
                     float s = sin_t[(x->ph + (uint32_t)pm) >> TSHIFT] * e;
                     x->ph += x->inc;
                     x->ph2 += x->inc2;
-                    x->idx = x->idx * x->idx_k + 0.25f * (1 - x->idx_k);   /* settles to a gentle tone */
+                    x->idx = x->idx * x->idx_k + 0.12f * (1 - x->idx_k);   /* settles to a gentle tone */
                     dryL[i] += s * x->pl;
                     dryR[i] += s * x->pr;
                     send[i] += s * 0.35f;
@@ -494,7 +495,7 @@ void ms_render(int16_t *out, int frames, float gain) {
             dl += el * 0.3f;
             dr += er * 0.3f;
             /* the room */
-            float in = sn * 0.2f, wl = 0, wr = 0;
+            float in = sn * 0.27f, wl = 0, wr = 0;
             if (lite) {
                 wl = (comb(&combs[0][0], in) + comb(&combs[0][2], in)) * 1.6f;
                 wr = (comb(&combs[1][1], in) + comb(&combs[1][3], in)) * 1.6f;
@@ -502,7 +503,10 @@ void ms_render(int16_t *out, int frames, float gain) {
                 for (int k = 0; k < 4; k++) { wl += comb(&combs[0][k], in); wr += comb(&combs[1][k], in); }
             }
             for (int k = 0; k < 2; k++) { wl = allpass(&aps[0][k], wl); wr = allpass(&aps[1][k], wr); }
-            float L = soft_clip((dl + wl * 0.5f) * 1.8f) * gain, R = soft_clip((dr + wr * 0.5f) * 1.8f) * gain;
+            /* a gentle low-pass over everything, to keep it soft */
+            mlp_l += (dl + wl * 0.65f - mlp_l) * 0.55f;
+            mlp_r += (dr + wr * 0.65f - mlp_r) * 0.55f;
+            float L = soft_clip(mlp_l * 1.8f) * gain, R = soft_clip(mlp_r * 1.8f) * gain;
             out[(done + i) * 2] = (int16_t)(L * 30000);
             out[(done + i) * 2 + 1] = (int16_t)(R * 30000);
         }
