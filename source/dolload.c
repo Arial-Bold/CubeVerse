@@ -139,7 +139,7 @@ int dol_find(const char *root, char (*out)[256], int max) {
 #ifdef GEKKO
 #include <gccore.h>
 #include "sound.h"
-#include "midi.h"
+#include "menumusic.h"
 #include <fat.h>
 #include <ogc/irq.h>
 #include "storage.h"
@@ -217,9 +217,7 @@ bool dol_launch(const char *path, char *err, size_t errlen) {
     VIDEO_SetBlack(TRUE);
     VIDEO_Flush();
     VIDEO_WaitVSync();
-    exit_log(false, "screen off, stopping music");
-    midi_shutdown();
-    exit_log(false, "music stopped, stopping sound");
+    exit_log(false, "screen off, stopping sound");
     sound_shutdown();
     exit_log(false, "sound stopped, stopping graphics");
     GX_AbortFrame();
