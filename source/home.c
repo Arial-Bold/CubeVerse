@@ -33,7 +33,7 @@ static const float WOB_PERIOD[4] = { 4.4f, 4.9f, 4.0f, 4.6f }, WOB_OFF[4] = { 0,
 static float ring;        /* where the ring has turned to (cube at the front, fractional while turning) */
 static int target;        /* the cube being turned to */
 static float turn_t = -1, turn_from;   /* time into the current turn (-1: not turning) */
-#define TURN_S 0.72f
+#define TURN_S 0.5f
 static float exit_armed_until;
 static float shown_t;     /* seconds on this screen */
 static bool from_splash;
@@ -74,7 +74,11 @@ static void home_enter(const char *arg, bool back) {
     ring = target = g_home_section;
     turn_t = -1;
     shown_t = 0;
-    menumusic_start(from_splash ? 0.5f : 0.2f);
+    /* the music begins just after the opening's sound has faded away (it's
+     * all but silent from about 12 s), so the two never run into each other */
+    float delay = from_splash ? 0.5f : 0.2f;
+    if (g_intro_sound_end >= 0 && g_intro_sound_end + 0.5f - g_time > delay) delay = g_intro_sound_end + 0.5f - g_time;
+    menumusic_start(delay);
     if (from_splash && g_set.update_auto && update_state() == UPD_NONE) update_request_check(true);
 }
 
@@ -101,28 +105,42 @@ static void home_update(void) {
         snprintf(m, sizeof(m), "CubeVerse %s is available. Press Z to see what's new.", update_latest_version());
         app_toast(m);
     }
-    /* turning: one cube at a time, taking as long as Flashcube's cube takes to
-     * turn to a side (0.95 s, the same easing); a new turn only starts once
-     * the last one has finished */
+    /* turning. A push starts a turn at once, even in the middle of one: the
+     * ring sets off again from wherever it is (the easing starts quickly and
+     * lands softly, so chained turns run together smoothly). Holding the
+     * stick keeps turning, one cube after another. */
     if (turn_t >= 0) {
         turn_t += g_dt;
-        float k = ease_bezier(clamp01(turn_t / TURN_S), 0.55f, 0, 0.3f, 1);
+        float k = ease_bezier(clamp01(turn_t / TURN_S), 0.25f, 0.6f, 0.3f, 1);
         ring = turn_from + (target - turn_from) * k;
         if (turn_t >= TURN_S) { ring = (float)target; turn_t = -1; }
     }
-    bool settled = turn_t < 0;
-    if (settled) {
-        int d = input_stick_dir();
-        if (d < 0) d = input_dir();
+    {
+        static int held_dir = DIR_NONE;
+        int sd = input_stick_dir();
+        int d = DIR_NONE;
+        if ((sd == DIR_LEFT || sd == DIR_RIGHT) && sd != held_dir) d = sd;   /* a new push of the stick */
+        else if ((sd == DIR_LEFT || sd == DIR_RIGHT) && sd == held_dir && (turn_t < 0 || turn_t > TURN_S * 0.6f)) d = sd;   /* held */
+        held_dir = sd;
+        if (d == DIR_NONE && sd == DIR_NONE) {
+            int pd = input_dir();   /* the D-pad (with its own repeat) */
+            if (pd == DIR_LEFT || pd == DIR_RIGHT) d = pd;
+        }
         if (d == DIR_RIGHT || d == DIR_LEFT) {
             turn_from = ring;
             target += d == DIR_RIGHT ? 1 : -1;
+            if (target - turn_from > 1.6f) target = (int)lroundf(turn_from) + 1;    /* never more than a cube and a bit ahead */
+            if (turn_from - target > 1.6f) target = (int)lroundf(turn_from) - 1;
             turn_t = 0;
             sound_play(SFX_TURN_SIDE);
             return;
         }
     }
-    if (!settled) return;
+    /* A opens the cube being turned to, even before it has quite arrived */
+    if (turn_t >= 0) {
+        if (input_pressed(BTN_A)) { ring = (float)target; turn_t = -1; open_section(front_cube()); }
+        return;
+    }
     if (input_pressed(BTN_A)) open_section(front_cube());
     else if (input_pressed(BTN_START)) { sound_play(SFX_SELECT); settings_panel_open(); }
     else if (input_pressed(BTN_Z) && (update_state() == UPD_AVAILABLE || update_state() == UPD_INSTALLED ||

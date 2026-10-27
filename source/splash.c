@@ -587,6 +587,8 @@ typedef IntroFlight Flight;
 static Flight flights[3][27];
 static float t;
 static bool assemble_played;
+float g_intro_sound_end = -1;   /* when the opening's sound has faded away (g_time), or -1 */
+#define INTRO_SOUND_SECONDS 13.5f   /* tools/sound/make_intro_clip.py: it eases away from 8.5 s */
 
 /* which home cube each logo cube becomes, where the logo cube sits, how it's turned */
 static const int TO_HOME[3] = { 0, 1, 3 };          /* middle -> Activity, right -> Communities, left -> My page */
@@ -616,7 +618,7 @@ static void go_home(void) {
 static void splash_update(void) {
     t += g_dt;
     /* the opening's sound, from the very start (if it's made in time) */
-    if (!assemble_played && t < 0.6f && g_set.intro && sound_loaded(SFX_ASSEMBLE)) { assemble_played = true; sound_play(SFX_ASSEMBLE); }
+    if (!assemble_played && t < 0.6f && g_set.intro && sound_loaded(SFX_ASSEMBLE)) { assemble_played = true; sound_play(SFX_ASSEMBLE); g_intro_sound_end = g_time + INTRO_SOUND_SECONDS; }
     if (t >= 0.6f) assemble_played = true;
     if (t > 0.3f && t < T_GLIDE && input_pressed(BTN_A | BTN_START | BTN_B)) t = T_GLIDE;   /* skip ahead */
     if (t >= T_HOME) go_home();

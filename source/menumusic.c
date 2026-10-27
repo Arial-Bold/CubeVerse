@@ -172,8 +172,8 @@ static void *mm_thread(void *arg) {
         /* keep the queue full (the chunk being copied is never touched) */
         while (filled < handed_r + NCHUNKS - 2 && !quit) {
             float want = target;
-            /* fade towards the wanted loudness: in over about 2.5 s, out over 1 s */
-            float step = CHUNK_FRAMES / (float)MS_RATE / (want > level ? 2.5f : 1.0f) * 0.5f;
+            /* fade towards the wanted loudness: in over about 2 s, out over 1 s */
+            float step = CHUNK_FRAMES / (float)MS_RATE / (want > level ? 2.0f : 1.0f) * 0.5f;
             if (level < want) { level += step; if (level > want) level = want; }
             else if (level > want) { level -= step; if (level < want) level = want; }
             make_chunk(level);

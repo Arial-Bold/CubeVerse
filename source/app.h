@@ -48,6 +48,7 @@ void app_toast(const char *msg);
 
 /* The home cube to show when going home. */
 extern int g_home_section;
+extern float g_intro_sound_end;   /* splash.c: when the opening's sound has faded away (g_time), or -1 */
 /* The unread notification count (updated in the background), or -1. */
 extern int g_unread;
 /* Set after posting, so the page we go back to loads again. */

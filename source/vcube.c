@@ -218,7 +218,7 @@ static void draw_icon(int side, float a, float t, float collapse) {
         float ba = a;
         if (collapse > 0) {
             float c = ease_bezier(clamp01(collapse * 1.15f - (i % 9) * 0.015f), 0.6f, 0, 0.4f, 1);
-            x = lerpf(x, 48, c); y = lerpf(y, 36, c);
+            x = lerpf(x, 48, c); y = lerpf(y, 40, c);   /* (the middle of the icon) */
             s = lerpf(ICON_BLOCK, 1.4f, c);
             ba *= 1 - c;
         }
