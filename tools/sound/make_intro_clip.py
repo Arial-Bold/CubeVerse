@@ -1,25 +1,24 @@
 """Usage: python3 tools/sound/make_intro_clip.py
 
-Renders CubeVerse's opening sound (the crowd, the landing clicks, the hush
-and the soft boing) to mono 16 kHz and packs it as 4-bit IMA ADPCM into
-source/intro_clip.h. Same as crowd_3_boing_soft, mixed to one channel."""
-import sys, wave, numpy as np
-import os
+Renders CubeVerse's opening sound (haze.py: wind and an airy pad as the
+blocks fly in, a bloom and a wide chord as the logo lights up, a breath as
+the cubes glide home) to mono 16 kHz and packs it as 4-bit IMA ADPCM into
+source/intro_clip.h. Needs numpy and scipy."""
+import os, sys, wave, numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import crowd as C
-from crowd import SR
-crowd = C.crowd_track().mean(0)
-asm = C.rd(os.path.join(HERE, 'landing_clicks.wav'))   # the pieces' clicks (32 kHz)
-n = int(8.0 * SR)
-mix = np.zeros(n)
-mix += crowd[:n] * 1.2
-clicks = asm.copy(); clicks[int(C.T_HUSH * SR):] = 0
-mix[:len(clicks)] += clicks * 0.35
-f = C.fun_boing(); i = int(C.T_LOGO * SR)
-mix[i:i + len(f)] += f[:n - i]
-mix = np.tanh(mix * 1.1) * 0.9
-mix[-800:] *= np.linspace(1, 0, 800)
+import haze
+st = haze.opening()
+mix = st.mean(0)
+mix = mix / (np.abs(mix).max() + 1e-9) * 0.85
+mix = np.tanh(mix * 1.15) / np.tanh(1.15) * 0.9
+# a long, gentle ending: from 8.5 s (as the cubes glide home) the sound
+# eases away over 5 s, slowly at first, and is silent at 13.5 s. The menu
+# music starts just after that (home.c).
+SRr = haze.SR
+i0, i1 = int(8.5 * SRr), len(mix)
+u = np.linspace(0, 1, i1 - i0)
+mix[i0:i1] *= (0.5 + 0.5 * np.cos(np.pi * u)) ** 1.6
 # to 16 kHz (the clip has nothing above 8 kHz worth keeping)
 from scipy.signal import resample_poly
 m16 = resample_poly(mix, 1, 2)
@@ -44,8 +43,8 @@ for s in pcm:
 if len(nib) & 1: nib.append(0)
 for k in range(0, len(nib), 2): out.append(nib[k] | (nib[k + 1] << 4))
 L = ['/* intro_clip.h - made by tools/sound/make_intro_clip.py: the opening\'s sound (a',
-     ' * happy crowd getting busier, the pieces clicking into place, a hush and a',
-     ' * soft "boing" when the logo is whole). CubeVerse\'s own, made from scratch.',
+     ' * haze and the light: wind and an airy pad as the blocks fly in, a bloom',
+     ' * and a wide chord as the logo lights up). CubeVerse\'s own, made from scratch.',
      ' * Mono, 16 kHz, 4-bit IMA ADPCM. */',
      '#pragma once', '#include <stdint.h>',
      '#define INTRO_CLIP_RATE 16000', '#define INTRO_CLIP_SAMPLES %d' % len(pcm),
