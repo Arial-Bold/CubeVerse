@@ -1,5 +1,8 @@
 # CubeVerse
 
+<img width="1280" height="960" alt="cubeverse_01_home" src="https://github.com/user-attachments/assets/19dba687-376e-4d30-b23c-f60c3b6a4737" />
+
+
 Juxtaposition, Pretendo Network's Miiverse revival, on the Nintendo GameCube. Read and post in communities, give Yeahs, comment, draw, and follow people, from a menu built like the GameCube's own.
 
 CubeVerse is homebrew, made with the blessing of the Juxt team. Download the latest `cubeverse` zip from [Releases](https://github.com/Arial-Bold/CubeVerse/releases), copy it to your SD card, and launch `cubeverse.dol` from Swiss or any other DOL loader.
