@@ -55,7 +55,7 @@ void GX_SetAlphaUpdate(u8 e) { (void)e; } void GX_SetColorUpdate(u8 e) { (void)e
 static int ntexgens;
 static float texoff[4][2];   /* the four looks of a smoothed picture (texture matrices) */
 static int gen_mtx[4];
-void GX_SetNumTexGens(u32 n) { ntexgens = (int)n; if (!n) tev = 0; if (n == 4) tev = 3; }
+void GX_SetNumTexGens(u32 n) { ntexgens = (int)n; if (!n) tev = 0; if (n == 4) tev = 3; else if (tev == 3) tev = 1; }
 void GX_SetTevKColorSel(u8 st, u8 sel) { (void)st; (void)sel; }
 void GX_SetTevKAlphaSel(u8 st, u8 sel) { (void)st; (void)sel; }
 void GX_LoadTexMtxImm(float m[3][4], u32 id, u8 type) {
@@ -67,7 +67,7 @@ void GX_SetTexCoordGen(u16 a, u32 b, u32 c, u32 d) {
     if (i >= 0) gen_mtx[i] = (int)d; }
 void GX_SetTevColorIn(u8 s, u8 a, u8 b, u8 c, u8 d) { (void)s; (void)a; (void)b; (void)c; (void)d; }
 void GX_SetTevColorOp(u8 s, u8 a, u8 b, u8 c, u8 d, u8 e) { (void)s; (void)a; (void)b; (void)c; (void)d; (void)e; }
-void GX_SetTevAlphaIn(u8 s, u8 a, u8 b, u8 c, u8 d) { (void)s; (void)a; (void)c; (void)d; if (b == GX_CA_TEXA) tev = 2; }
+void GX_SetTevAlphaIn(u8 s, u8 a, u8 b, u8 c, u8 d) { (void)s; (void)a; (void)c; (void)d; if (b == GX_CA_TEXA && tev != 3) tev = 2; }
 void GX_SetTevAlphaOp(u8 s, u8 a, u8 b, u8 c, u8 d, u8 e) { (void)s; (void)a; (void)b; (void)c; (void)d; (void)e; }
 void GX_InitTexObj(GXTexObj *o, void *data, u16 w, u16 h, u8 fmt, u8 ws, u8 wt, u8 mip) {
     (void)wt; (void)mip; o->data = data; o->w = w; o->h = h; o->fmt = fmt; o->wrap = ws; }
@@ -156,7 +156,7 @@ static void tri(const V *A, const V *B, const V *C) {
                         sample(u + du, v + dv, t);
                         for (int q = 0; q < 4; q++) acc[q] += t[q] * 0.25f;
                     }
-                    r *= acc[0]; g *= acc[1]; b *= acc[2];
+                    r *= acc[0]; g *= acc[1]; b *= acc[2]; a *= acc[3];
                 } else sample(u, v, t);
                 if (tev == 1) { r *= t[0]; g *= t[1]; b *= t[2]; a *= t[3]; }
                 else a *= t[3];

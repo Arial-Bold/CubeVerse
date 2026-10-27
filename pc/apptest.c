@@ -32,14 +32,23 @@ int main(int argc, char **argv) {
     app_init();
     if (wide) gfx_set_widescreen(true);
     if (!strcmp(script, "intro")) {
-        float t[] = { 0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f, 7.5f, 8.5f, 9.5f, 10.5f };
+        float t[] = { 0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.2f, 5.7f, 6.0f, 6.5f, 7.5f, 8.5f, 9.5f, 10.5f };
         float now = 0;
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < 13; i++) {
             int f = (int)((t[i] - now) * 60);
             run(f);
             now = t[i];
             char n[32];
             snprintf(n, sizeof(n), "intro_%04.1f", t[i]);
+            shot(n);
+        }
+        return 0;
+    }
+    if (!strcmp(script, "introvid")) {   /* every other frame of the opening, for a preview video */
+        for (int i = 0; i < 30 * 12; i++) {
+            run(2);
+            char n[32];
+            snprintf(n, sizeof(n), "vid/f%04d", i);
             shot(n);
         }
         return 0;
