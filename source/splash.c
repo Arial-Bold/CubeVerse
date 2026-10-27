@@ -1,13 +1,20 @@
-/* splash.c - the opening. Solid blocks fly in from every direction and
- * stack into the three cubes of the CubeVerse logo, each block carrying
- * its piece of the logo's art; "CubeVerse" appears under them, fades, and
- * the three cubes glide and turn into the front three glass cubes of the
- * home screen (the fourth fades in behind), which then takes over.
+/* splash.c - the opening. In the dark, indigo haze drifts through soft beams
+ * of light and sparkling dust; solid blocks fall through it as dark
+ * silhouettes with a violet edge and stack into the three cubes of the
+ * CubeVerse logo, each block carrying its piece of the logo's art. As the
+ * last ones land, the light turns green and bursts out from behind the
+ * logo, leaving it backlit; "CubeVerse" appears under it, fades, and the haze clears as the
+ * three cubes glide and turn into the front three glass cubes of the home
+ * screen (the fourth fades in behind), which then takes over.
+ *
+ * All the light is the GPU's: the haze is a soft noise texture in layers,
+ * added on top of each other (additive blending), the glows and dust are a
+ * soft round texture, the beams are meshes shaded from their middle out.
  *
  * The logo cubes are real rounded cubes: flat sides, edges rounded in
- * strips and a cap on each corner, all lit from the top left. Each cube is
- * cut 3 x 3 x 3; every piece holds its own part of the surface (and the
- * face drawn on the front), plus plain inner walls seen only in flight. */
+ * strips and a cap on each corner. Each cube is cut 3 x 3 x 3; every piece
+ * holds its own part of the surface (and the face drawn on the front),
+ * plus plain inner walls seen only in flight. */
 #include "app.h"
 #include "home.h"
 #include "vcube.h"
@@ -307,6 +314,15 @@ static bool facing(V3 a, V3 b, V3 c) {
     return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax) > 0;
 }
 
+/* how much the blocks are dark silhouettes (1) rather than lit (0) */
+static float sil;
+static Color silhouette(Color c) {
+    if (sil <= 0) return c;
+    /* a deep indigo, a little of the shading left so the faces still read */
+    int r = (int)(c.r * 0.08f + 6), g = (int)(c.g * 0.06f + 4), b = (int)(c.b * 0.16f + 16);
+    return rgba((u8)(c.r + (r - c.r) * sil), (u8)(c.g + (g - c.g) * sil), (u8)(c.b + (b - c.b) * sil), c.a);
+}
+
 static void draw_tris(const Model *m, int piece, const M34 *mx, float cx, float cy, float al) {
     gfx_begin_3d(mx->m, cx, cy, VC_PERSP);
     /* surface first, then the art over it */
@@ -318,7 +334,7 @@ static void draw_tris(const Model *m, int piece, const M34 *mx, float cx, float 
             V3 a = xf(mx, t->p[0]), b = xf(mx, t->p[1]), c = xf(mx, t->p[2]);
             if (!facing(a, b, c)) continue;
             float p[9] = { a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z };
-            Color col = t->c;
+            Color col = silhouette(t->c);
             col.a = (u8)(255 * al);
             Color c3[3] = { col, col, col };
             gfx_tri3d(p, c3);
@@ -358,7 +374,7 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
             v[o2] = k >= 2 ? a1[o2] : a0[o2];
             c[k] = v3(v[0], v[1], v[2]);
         }
-        Color col = lit(rgba(0xE4, 0xF1, 0xDC, 255), fd->n);
+        Color col = silhouette(lit(rgba(0xE4, 0xF1, 0xDC, 255), fd->n));
         col.a = (u8)(255 * al);
         Color c3[3] = { col, col, col };
         /* wind it so it faces out of the piece, then draw it only if that side
@@ -379,6 +395,183 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
     gfx_end_3d();
 }
 
+/* A flying block's green edge: its box, a little bigger, in light, drawn
+ * just before the block (which then covers all but the rim). */
+static void draw_rim(int p, const M34 *mx, float cx, float cy, float grow, Color c) {
+    int id[3] = { p % 3, (p / 3) % 3, p / 9 };
+    float lo[3], hi[3], mid[3];
+    for (int k = 0; k < 3; k++) {
+        lo[k] = id[k] == 0 ? -H : id[k] == 1 ? -CUT : CUT;
+        hi[k] = id[k] == 0 ? -CUT : id[k] == 1 ? CUT : H;
+        mid[k] = (lo[k] + hi[k]) / 2;
+        lo[k] = mid[k] + (lo[k] - mid[k]) * grow;
+        hi[k] = mid[k] + (hi[k] - mid[k]) * grow;
+    }
+    gfx_begin_3d(mx->m, cx, cy, VC_PERSP);
+    Color c3[3] = { c, c, c };
+    for (int f = 0; f < 6; f++) {
+        const FaceDef *fd = &FACES[f];
+        float nv[3] = { fd->n.x, fd->n.y, fd->n.z };
+        int ax = nv[0] != 0 ? 0 : nv[1] != 0 ? 1 : 2, o1 = (ax + 1) % 3, o2 = (ax + 2) % 3;
+        V3 q[4];
+        for (int k = 0; k < 4; k++) {
+            float v[3];
+            v[ax] = nv[ax] > 0 ? hi[ax] : lo[ax];
+            v[o1] = (k == 1 || k == 2) ? hi[o1] : lo[o1];
+            v[o2] = k >= 2 ? hi[o2] : lo[o2];
+            q[k] = v3(v[0], v[1], v[2]);
+        }
+        V3 nrm = vcross(vadd(q[1], vmul(q[0], -1)), vadd(q[2], vmul(q[0], -1)));
+        if (vdot(nrm, fd->n) < 0) { V3 tmp = q[1]; q[1] = q[3]; q[3] = tmp; }
+        V3 w[4];
+        for (int k = 0; k < 4; k++) w[k] = xf(mx, q[k]);
+        if (!facing(w[0], w[1], w[2])) continue;
+        float a[9] = { w[0].x, w[0].y, w[0].z, w[1].x, w[1].y, w[1].z, w[2].x, w[2].y, w[2].z };
+        float b[9] = { w[0].x, w[0].y, w[0].z, w[2].x, w[2].y, w[2].z, w[3].x, w[3].y, w[3].z };
+        gfx_tri3d(a, c3);
+        gfx_tri3d(b, c3);
+    }
+    gfx_end_3d();
+}
+
+/* ------------------------------------------------------- the atmosphere */
+
+/* The light starts in the GameCube's own deep indigo and purple, and turns
+ * green only as the logo comes together (gm: 0 indigo .. 1 green). */
+static float gm;
+static Color tint(Color indigo, Color green, float a) {
+    return rgba((u8)(indigo.r + (green.r - indigo.r) * gm), (u8)(indigo.g + (green.g - indigo.g) * gm),
+                (u8)(indigo.b + (green.b - indigo.b) * gm), (u8)(255 * clamp01(a)));
+}
+
+
+static GfxPattern haze_tex, glow_tex;
+static bool atmos_ready;
+#define NDUST 90
+typedef struct { float x, y, vx, vy, size, phase; } Dust;
+static Dust dust[NDUST];
+
+static float hash2(int x, int y, int s) {
+    unsigned h = (unsigned)x * 374761393u + (unsigned)y * 668265263u + (unsigned)s * 2246822519u;
+    h = (h ^ (h >> 13)) * 1274126177u;
+    return ((h ^ (h >> 16)) & 0xFFFF) / 65535.0f;
+}
+
+/* soft, tileable noise for the haze: a few octaves of smooth value noise */
+static void make_atmos(void) {
+    if (atmos_ready) return;
+    atmos_ready = true;
+    enum { HS = 128, GS = 64 };
+    static unsigned char hz[HS * HS], gl[GS * GS];
+    for (int y = 0; y < HS; y++)
+        for (int x = 0; x < HS; x++) {
+            float v = 0, amp = 0.55f, tot = 0;
+            for (int o = 0, cells = 4; o < 4; o++, cells *= 2, amp *= 0.5f) {
+                float fx = (float)x * cells / HS, fy = (float)y * cells / HS;
+                int ix = (int)fx, iy = (int)fy;
+                float ux = fx - ix, uy = fy - iy;
+                ux = ux * ux * (3 - 2 * ux); uy = uy * uy * (3 - 2 * uy);
+                float a = hash2(ix % cells, iy % cells, o), b = hash2((ix + 1) % cells, iy % cells, o);
+                float c = hash2(ix % cells, (iy + 1) % cells, o), d = hash2((ix + 1) % cells, (iy + 1) % cells, o);
+                v += amp * ((a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy);
+                tot += amp;
+            }
+            v /= tot;
+            v = (v - 0.25f) / 0.55f;
+            hz[y * HS + x] = (unsigned char)(255 * (v < 0 ? 0 : v > 1 ? 1 : v * v));
+        }
+    for (int y = 0; y < GS; y++)
+        for (int x = 0; x < GS; x++) {
+            float dx = (x + 0.5f) / GS * 2 - 1, dy = (y + 0.5f) / GS * 2 - 1, d2 = dx * dx + dy * dy;
+            float v = d2 >= 1 ? 0 : expf(-d2 * 4.0f) * (1 - d2);
+            gl[y * GS + x] = (unsigned char)(255 * v);
+        }
+    gfx_pattern_init(&haze_tex, hz, HS, HS);
+    gfx_pattern_init(&glow_tex, gl, GS, GS);
+    unsigned seed = 77;
+    for (int i = 0; i < NDUST; i++) {
+        dust[i].x = intro_frand(&seed) * 900 - 30;
+        dust[i].y = intro_frand(&seed) * 540 - 30;
+        dust[i].vx = (intro_frand(&seed) - 0.5f) * 6;
+        dust[i].vy = 3 + intro_frand(&seed) * 7;
+        dust[i].size = 2.5f + intro_frand(&seed) * 4;
+        dust[i].phase = intro_frand(&seed) * 6.28f;
+    }
+}
+
+/* a soft round glow, added on */
+static void glow(float cx, float cy, float rx, float ry, Color c) {
+    gfx_pattern_rect(&glow_tex, cx - rx, cy - ry, rx * 2, ry * 2, 0, 0, 1, 1, c);
+}
+
+/* where the beams are at time t (x at the top), and how wide */
+static void beam_at(int i, float t, float *x, float *w) {
+    static const float BX[3] = { 0.5f, 0.3f, 0.71f }, BW[3] = { 70, 40, 46 }, SP[3] = { 0.21f, 0.27f, 0.17f };
+    *x = gfx_width() * BX[i] + sinf(t * SP[i] * 6.2832f + i * 1.7f) * 60;
+    *w = BW[i];
+}
+
+static void beams(float t, float a) {
+    float W = gfx_width();
+    enum { BC = 8, BR = 4 };
+    float xy[(BC + 1) * (BR + 1) * 2];
+    Color col[(BC + 1) * (BR + 1)];
+    static const float BS[3] = { 1.0f, 0.5f, 0.55f };
+    for (int b = 0; b < 3; b++) {
+        float bx, bw;
+        beam_at(b, t, &bx, &bw);
+        float lean = sinf(t * 0.35f + b) * 0.14f;
+        for (int j = 0; j <= BR; j++)
+            for (int i = 0; i <= BC; i++) {
+                int k = j * (BC + 1) + i;
+                float v = (float)j / BR, u = (float)i / BC * 2 - 1;
+                float y = -40 + v * 560, half = bw + y * 0.32f;
+                xy[k * 2] = bx + y * lean + u * half * 1.6f;
+                xy[k * 2 + 1] = y;
+                float across = expf(-u * u * 3.2f), down = 1 - v;
+                col[k] = tint(rgba(120, 100, 255, 0), rgba(110, 255, 90, 0), a * BS[b] * across * down * (0.4f + 0.6f * down) * 0.45f);
+            }
+        gfx_mesh(BC, BR, xy, col);
+    }
+    (void)W;
+}
+
+/* the haze, the beams and the dust, all added on to the dark (a: 0..1) */
+static void atmosphere(float t, float a, float beam_boost) {
+    if (a <= 0) return;
+    make_atmos();
+    float fx, fy, fw, fh;
+    gfx_full_area(&fx, &fy, &fw, &fh);
+    gfx_set_additive(true);
+    /* a broad green glow, brighter in the middle */
+    glow(fx + fw / 2, 205, fw * 0.75f, fh * 0.75f, tint(rgba(55, 40, 150, 0), rgba(40, 120, 30, 0), a * 0.55f));
+    /* the haze: three layers drifting their own ways */
+    static const float SC[3] = { 1.1f, 1.7f, 2.6f }, DX[3] = { 0.011f, -0.017f, 0.023f }, DY[3] = { -0.006f, 0.009f, -0.013f };
+    static const u8 HA[3] = { 70, 55, 40 };
+    for (int l = 0; l < 3; l++) {
+        float u0 = t * DX[l] + l * 0.37f, v0 = t * DY[l] + l * 0.61f;
+        gfx_pattern_rect(&haze_tex, fx, fy, fw, fh, u0, v0, u0 + SC[l] * fw / 640, v0 + SC[l] * fh / 640,
+                         tint(rgba(70, 55, 190, 0), rgba(70, 200, 55, 0), HA[l] / 255.0f * clamp01(a)));
+    }
+    beams(t, a * (0.45f + 0.55f * beam_boost));
+    /* dust, catching the light: brighter inside a beam */
+    for (int i = 0; i < NDUST; i++) {
+        Dust *d = &dust[i];
+        float x = fmodf(d->x + d->vx * t + 2000, fw + 60) + fx - 30, y = fmodf(d->y + d->vy * t, fh + 60) + fy - 30;
+        float lit_by = 0.15f;
+        for (int b = 0; b < 3; b++) {
+            float bx, bw;
+            beam_at(b, t, &bx, &bw);
+            float dx = (x - bx) / (bw + y * 0.32f);
+            lit_by += expf(-dx * dx * 2.5f) * (1 - y / 520);
+        }
+        float tw = 0.6f + 0.4f * sinf(t * 2.3f + d->phase);
+        u8 al = (u8)(255 * clamp01(a * lit_by * tw * 0.9f));
+        if (al > 4) glow(x, y, d->size, d->size, tint(rgba(190, 175, 255, 0), rgba(190, 255, 160, 0), al / 255.0f));
+    }
+    gfx_set_additive(false);
+}
+
 /* ------------------------------------------------------------ the show */
 
 #define T_FLY INTRO_T_FLY /* each piece's flight */
@@ -393,7 +586,7 @@ static void draw_walls(int ix, int iy, int iz, const M34 *mx, float cx, float cy
 typedef IntroFlight Flight;
 static Flight flights[3][27];
 static float t;
-static bool start_played, assemble_played;
+static bool assemble_played;
 
 /* which home cube each logo cube becomes, where the logo cube sits, how it's turned */
 static const int TO_HOME[3] = { 0, 1, 3 };          /* middle -> Activity, right -> Communities, left -> My page */
@@ -411,7 +604,6 @@ static void splash_enter(const char *arg, bool back) {
     }
     intro_flights(&flights[0][0]);   /* (the same ones the sound is timed to) */
     t = 0;
-    start_played = false;
     assemble_played = false;
     if (!g_set.intro) t = T_GLIDE + T_GLIDE_LEN;   /* opening turned off: straight to the cubes settling */
 }
@@ -423,13 +615,10 @@ static void go_home(void) {
 
 static void splash_update(void) {
     t += g_dt;
-    /* the pieces' whoosh and clicks, from the very start (if it's made in time) */
+    /* the opening's sound, from the very start (if it's made in time) */
     if (!assemble_played && t < 0.6f && g_set.intro && sound_loaded(SFX_ASSEMBLE)) { assemble_played = true; sound_play(SFX_ASSEMBLE); }
     if (t >= 0.6f) assemble_played = true;
     if (t > 0.3f && t < T_GLIDE && input_pressed(BTN_A | BTN_START | BTN_B)) t = T_GLIDE;   /* skip ahead */
-    if (!start_played && t >= T_SOLID) {
-        if (sound_loaded(SFX_START) || t > T_SOLID + 1.5f) { start_played = true; sound_play(SFX_START); }
-    }
     if (t >= T_HOME) go_home();
 }
 
@@ -449,6 +638,39 @@ static void splash_draw(float open) {
     float bg = clamp01((t - T_GLIDE) / (T_GLIDE_LEN + 0.0f));
     cv_background(bg);
     float W = gfx_width(), cy0 = home_center_y();
+
+    /* the haze and the light, clearing as the cubes glide home */
+    float burst = t < T_SOLID - 0.15f ? 0 : clamp01((t - (T_SOLID - 0.15f)) / 0.25f) * (0.45f + 0.55f * (1 - clamp01((t - T_SOLID) / 0.9f)));
+    gm = ease_inout(clamp01((t - (T_SOLID - 0.5f)) / 0.9f));
+    float atm = clamp01(t / 1.4f) * (1 - glide);
+    atmosphere(t, atm, burst);
+    /* the light behind the logo: a swell as the last blocks land, a burst,
+     * then a steady glow that leaves the logo backlit */
+    {
+        float lx = W / 2, ly = cy0 - 6;
+        float swell = clamp01((t - (T_SOLID - 0.9f)) / 0.9f);
+        float fade_out = 1 - glide;
+        if (t < T_SOLID && swell > 0) {
+            gfx_set_additive(true);
+            glow(lx, ly, 70 + 60 * swell, 60 + 50 * swell, tint(rgba(130, 110, 255, 0), rgba(120, 255, 90, 0), swell * swell * 0.6f));
+            gfx_set_additive(false);
+        } else if (t >= T_SOLID && fade_out > 0) {
+            float k = clamp01((t - T_SOLID) / 0.9f);
+            float r = 150 + 40 * k, inten = (1.05f - 0.6f * ease_bezier(k, 0.3f, 0, 0.3f, 1)) * fade_out;
+            gfx_set_additive(true);
+            glow(lx, ly, r * 1.9f, r * 1.5f, rgba(60, 200, 40, (u8)(255 * clamp01(inten * 0.55f))));
+            glow(lx, ly, r, r * 0.85f, rgba(150, 255, 110, (u8)(255 * clamp01(inten * 0.8f))));
+            glow(lx, ly, r * 0.55f, r * 0.45f, rgba(230, 255, 210, (u8)(255 * clamp01(inten * 0.7f))));
+            /* a ring of light rushing out at the burst */
+            if (k < 1) {
+                float rr = 120 + 420 * ease_bezier(k, 0.1f, 0.6f, 0.3f, 1);
+                glow(lx, ly, rr, rr * 0.8f, rgba(120, 255, 90, (u8)(255 * clamp01((1 - k) * (1 - k) * 0.35f))));
+            }
+            gfx_set_additive(false);
+        }
+    }
+    /* blocks are silhouettes until the light reaches them */
+    sil = 1 - clamp01((t - T_SOLID) / 0.7f);
 
     /* the back cube (Notifications) fades in as the others arrive */
     float back_a = clamp01((t - (T_GLIDE + 0.7f)) / 1.2f);
@@ -502,6 +724,13 @@ static void splash_draw(float open) {
                 float lt = t - flights[c][p].delay;
                 float fade = clamp01(lt / 0.25f);
                 float settle = clamp01((lt - (T_FLY - 0.6f)) / 0.55f);
+                /* the green edge, fading as it lands */
+                float rim_a = fade * (1 - settle) * atm;
+                if (rim_a > 0.02f) {
+                    gfx_set_additive(true);
+                    draw_rim(p, &mats[p], ccx, ccy, 1.07f, tint(rgba(130, 110, 255, 0), rgba(110, 255, 80, 0), 0.9f * rim_a));
+                    gfx_set_additive(false);
+                }
                 if (lt < T_FLY - 0.05f) draw_walls(p % 3, (p / 3) % 3, p / 9, &mats[p], ccx, ccy, fade, settle);
                 draw_tris(&model[c], p, &mats[p], ccx, ccy, fade);
             }
@@ -530,7 +759,7 @@ static void splash_draw(float open) {
         const char *name = "CubeVerse";
         float tw = gfx_text_width_sp(FONT_CUBE, 52, -1, name, -1);
         ui_text_glow(FONT_CUBE, 52, -1, W / 2 - tw / 2, 282 + rise, 60, rgba(255, 255, 255, (u8)(255 * wa)),
-                     rgba(127, 224, 90, (u8)(150 * wa)), 9, name);
+                     rgba(150, 255, 120, (u8)(170 * wa)), 11, name);
     }
     /* the home screen's parts arrive */
     float ha = clamp01((t - (T_GLIDE + 1.7f)) / 0.9f);

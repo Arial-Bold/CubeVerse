@@ -39,7 +39,7 @@ static void synth(int id) {
  * black screen). The opening's own sounds first: the pieces' whoosh and
  * clicks start at once, the chime 5 seconds in. */
 static const Sfx synth_order[] = {
-    SFX_ASSEMBLE, SFX_START, SFX_HOVER, SFX_HOVER2, SFX_HOVER3, SFX_SELECT, SFX_BACK, SFX_TURN_SIDE, SFX_TURN_CENTER,
+    SFX_ASSEMBLE, SFX_HOVER, SFX_HOVER2, SFX_HOVER3, SFX_SELECT, SFX_BACK, SFX_TURN_SIDE, SFX_TURN_CENTER,
     SFX_OPEN, SFX_CLOSE, SFX_CONFIRM, SFX_CANCEL, SFX_LOADED, SFX_KEY, SFX_ERROR,
 };
 static thr_t synth_th;
@@ -49,6 +49,7 @@ static volatile bool synth_quit;
 static void *synth_main(void *arg) {
     (void)arg;
     bool done[SFX_COUNT] = { false };
+    done[SFX_START] = true;   /* not played any more: the opening's clip has its own chord */
     for (unsigned k = 0; k < sizeof(synth_order) / sizeof(synth_order[0]) && !synth_quit; k++) {
         synth(synth_order[k]);
         done[synth_order[k]] = true;

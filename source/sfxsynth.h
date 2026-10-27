@@ -15,9 +15,9 @@ typedef enum {
     SFX_TURN_SIDE,    /* the cube turning to a side */
     SFX_TURN_CENTER,  /* the cube turning back to the front */
     SFX_OPEN,         /* opening a side of the cube */
-    SFX_START,        /* the menu appearing after the opening */
+    SFX_START,        /* (no longer played: the opening's clip has its own chord) */
     SFX_CLOSE, SFX_ERROR, SFX_KEY, SFX_LOADED,
-    SFX_ASSEMBLE,     /* the opening: pieces whooshing in and clicking together */
+    SFX_ASSEMBLE,     /* the opening: the haze, the light and the logo's chord */
     SFX_COUNT
 } Sfx;
 

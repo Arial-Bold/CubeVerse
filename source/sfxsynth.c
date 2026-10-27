@@ -162,12 +162,12 @@ int sfx_length(int id) {
     return (int)(recipes[id].length * SFX_RATE);
 }
 
-/* The opening (SFX_ASSEMBLE): a happy crowd getting busier as the pieces
- * fly in, cheering as they land (with their clicks), a hush, and a soft
- * "boing" into a chord when the logo is whole. It's a clip made beforehand
- * (tools/sound/make_intro_clip.py: a crowd of voices is too much to make in
- * the opening's first moment), kept as 4-bit IMA ADPCM at 16 kHz and
- * unpacked here to the sounds' 32 kHz. */
+/* The opening (SFX_ASSEMBLE): wind rising through the haze and an airy pad
+ * with a slow heartbeat as the blocks fly in, a soft bloom of air as the
+ * light bursts behind the logo, a wide chord, sparkles of dust, and a breath
+ * as the cubes glide home. It's a clip made beforehand
+ * (tools/sound/make_intro_clip.py, from tools/sound/haze.py), kept as 4-bit
+ * IMA ADPCM at 16 kHz and unpacked here to the sounds' 32 kHz. */
 static bool render_assemble(int16_t *out, int n) {
     static const int16_t step_tab[89] = {
         7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107,
