@@ -1,8 +1,5 @@
 # CubeVerse
 
-<img width="1280" height="960" alt="cubeverse_01_home" src="https://github.com/user-attachments/assets/19dba687-376e-4d30-b23c-f60c3b6a4737" />
-
-
 Juxtaposition, Pretendo Network's Miiverse revival, on the Nintendo GameCube. Read and post in communities, give Yeahs, comment, draw, and follow people, from a menu built like the GameCube's own.
 
 CubeVerse is homebrew, made with the blessing of the Juxt team. Download the latest `cubeverse` zip from [Releases](https://github.com/Arial-Bold/CubeVerse/releases), copy it to your SD card, and launch `cubeverse.dol` from Swiss or any other DOL loader.
@@ -11,19 +8,29 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 
 ## Features
 
+### The opening and the home cubes
+- Solid blocks fly in through glowing indigo haze, beams of light and drifting dust, and build the CubeVerse logo in 3D. As the last ones land, the light turns green and bursts out from behind the logo. The three logo cubes then glide into place and turn into the home screen's glass cubes. The haze, light and glow are all drawn by the GameCube's graphics chip, with an atmospheric sound of rising wind, a soft heartbeat and a wide chord.
+- Four glass cubes on a ring: **Activity**, **Communities**, **Notifications** and **My page**. Turn the ring with the Control Stick or D-pad: a push turns it straight away (hold to keep turning), and A opens the cube you're turning to. Each cube drifts to its own rhythm, with a square block icon floating inside that changes shape now and then.
+- A soft old-TV look: gentle scanlines, a slight curve and dark edges.
+- Menu sounds and CubeVerse's own mellow background music, made by the GameCube as it plays. After the opening, its sound fades away gently and the music fades in.
+
+### Moving around
+- A pointer, moved with the Control Stick like a mouse (its speed is in Settings). A clicks, the D-pad hops between things and the C-stick scrolls.
+- Lists run off the bottom of the screen into a fading line of light, and more posts load as you scroll.
+
 ### Reading
 - **Activity:** your feed, posts from people you follow, or everyone (My Feed, People, Global).
 - **Communities:** popular and new communities, or all of them, each with its icon, name and followers.
 - **A community:** its newest or most popular posts, Follow, and Post here.
 - **A post:** the post, big, with its comments.
 - **Notifications:** Yeahs, comments and new followers. The number of new ones shows on the home screen.
-- **My page** and anyone's page: their Mii, bio, followers, and their posts or Yeahs.
+- **My page** and anyone's page: their Mii, bio, country and followers, and their posts, Yeahs or followers (click the followers box to see them).
 - **Japanese** posts show in Japanese (kana and about 6,300 kanji).
 - Pictures (Mii faces, icons, drawings, screenshots) are kept on the SD card (`cubeverse/cache`, up to 48 MB), so pages you've seen before load quickly.
 
 ### Joining in
 - **Yeah!** any post with X or its button.
-- **Write** posts and comments with the on-screen keyboard. Pick a feeling and mark spoilers.
+- **Write** posts and comments with the on-screen keyboard, laid out like the Wii U's with a row of numbers on top. Pick a feeling from the big buttons beside it and mark spoilers. On the keyboard, the D-pad wraps round from one end of a row to the other.
 - **Draw** on the drawing pad (Juxt's 320 x 120 black and white): three pen sizes, an eraser, undo and clear.
 - **Follow** communities and people.
 
@@ -33,7 +40,7 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 - Juxt only lets accounts that have opened Juxt once on a Wii U or 3DS use it, so a brand-new account needs that first.
 
 ### Settings (START on the home screen)
-- 4:3 or 16:9, standard (640) or full (704) width, screen margin, video mode.
+- 4:3 or 16:9, standard (640) or full (704) width, overscan, resolution.
 - Opening animation, pointer speed, menu sounds and music, volumes.
 - Your Pretendo account (sign out), software updates, and what Exit does.
 
