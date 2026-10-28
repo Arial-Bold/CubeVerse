@@ -53,5 +53,5 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 ## Notes
 
 CubeVerse isn't affiliated with Nintendo, or Pretendo Network and Juxtaposition team.
-
+Designed and art-directed by Arial-Bold. Code written with AI assistance (Claude by Anthropic).
 Japanese text uses M PLUS 1p and Noto Sans CJK JP (SIL Open Font License). Every sound and the music are CubeVerse's own, made from scratch.
