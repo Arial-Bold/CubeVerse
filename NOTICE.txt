@@ -1,0 +1,10 @@
+CubeVerse
+Copyright (c) 2026 Arial-Bold
+
+CubeVerse is an independent project and is not affiliated with, endorsed by,
+or sponsored by Pretendo Network or Nintendo. All trademarks belong to their
+respective owners. Use of online services accessed through CubeVerse is
+subject to those services' own terms.
+
+Third-party components included in CubeVerse remain subject to their
+respective licenses and terms.
