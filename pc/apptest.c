@@ -44,6 +44,50 @@ int main(int argc, char **argv) {
         }
         return 0;
     }
+    if (!strcmp(script, "kbd")) {   /* the keyboard: writing a comment, symbols, signing in */
+        run(60 * 13);
+        JResult r = { 0 };
+        juxt_sign_in(&r, "kirbyfan", "secret");
+        for (int i = 0; i < 300 && r.state != JS_READY && r.state != JS_FAILED; i++) run(1);
+        app_go(SCR_COMPOSE, "r|0001AbC1xyz|2551084081|GameCube Homebrew"); run(40);
+        const char *msg = "Finally got my GameCube online again";
+        for (const char *m = msg; *m; m++) { (void)m; }
+        ptr_set(470, 210); run(4);
+        for (int i = 0; i < 6; i++) { press(BTN_A); run(3); }
+        press(BTN_RIGHT); run(3); press(BTN_RIGHT); run(3); press(BTN_RIGHT); run(3); press(BTN_RIGHT); run(3);
+        press(BTN_RIGHT); run(3); press(BTN_RIGHT); run(3); press(BTN_RIGHT); run(10);   /* past Del: back round to q */
+        shot("kbd_compose");
+        click(120, 200); run(10);   /* the second feeling */
+        ptr_set(470, 330); run(4); shot("kbd_compose_2");
+        app_go(SCR_SIGNIN, ""); run(40); press(BTN_A); run(30); shot("kbd_signin");
+        return 0;
+    }
+    if (!strcmp(script, "eggs")) {   /* the home screen's easter eggs (run with CV_SLEEP_AFTER=3) */
+        run(60 * 13);
+        for (int i = 0; i < 20; i++) { hold(0, 1, 0, 4); run(14); }   /* spin the ring round */
+        run(20); shot("egg_dizzy_1"); run(25); shot("egg_dizzy_2");
+        run(60 * 2);
+        for (int i = 0; i < 10; i++) { press(BTN_Y); run(8); }        /* poke the logo */
+        run(10); shot("egg_tumble_1"); run(20); shot("egg_tumble_2"); run(30); shot("egg_tumble_3");
+        run(60 * 8);                                                     /* left alone: asleep */
+        shot("egg_sleep_1"); run(90); shot("egg_sleep_2");
+        press(BTN_A); run(20); shot("egg_wake");
+        return 0;
+    }
+    if (!strcmp(script, "icons")) {   /* each home cube's icon through its change of shape */
+        run(60 * 13);
+        for (int c = 0; c < 4; c++) {
+            for (int k = 0; k < 6; k++) {
+                char n[32];
+                snprintf(n, sizeof(n), "icons_%d_%d", c, k);
+                shot(n);
+                run(60);
+            }
+            hold(0, 1, 0, 6);
+            run(60);
+        }
+        return 0;
+    }
     if (!strcmp(script, "introvid")) {   /* every other frame of the opening, for a preview video */
         for (int i = 0; i < 30 * 12; i++) {
             run(2);
@@ -114,10 +158,13 @@ int main(int argc, char **argv) {
         hold(0, 1, 0, 6); run(70);
         press(BTN_A); wait_loaded(90); shot("17_my_page");
         hold(0, 0, 1, 150); shot("17b_my_page_scrolled");
+        press(BTN_L); wait_loaded(90); shot("17c_my_followers");
+        press(BTN_R); wait_loaded(90);
         press(BTN_B); run(60); press(BTN_A); wait_loaded(90);
         click(120, 210); wait_loaded(90); shot("18_post_from_profile");
         press(BTN_B); run(40); press(BTN_B); run(80);
         press(BTN_START); run(30); shot("19_settings");
+        press(BTN_B); run(30); press(BTN_B); run(20); shot("20_toast");
     } else if (!strcmp(script, "signin")) {
         press(BTN_A); run(60); shot("s1_signin");
         click(200, 160); run(20); shot("s2_keyboard");

@@ -44,6 +44,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if path.startswith('/titles/'): return self.send(200, page('feed_more.html' if 'offset' in u.query else 'community.html'))
         if path.startswith('/posts/'): return self.send(200, page('post.html'))
         if path == '/users/notifications.json': return self.send(200, b'{"message_count":0,"notification_count":3}', 'application/json')
+        if path.startswith('/users/') and path.endswith('/followers'): return self.send(200, page('followers.html'))
         if path.startswith('/users/'): return self.send(200, page('user.html'))
         if path.startswith('/news'): return self.send(200, page('news.html'))
         self.send(404, b'not found')
