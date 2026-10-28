@@ -2,21 +2,11 @@
 
 Juxtaposition, Pretendo Network's Miiverse revival, on the Nintendo GameCube. Read and post in communities, give Yeahs, comment, draw, and follow people, from a menu built like the GameCube's own.
 
-CubeVerse is homebrew, made with the blessing of the Juxt team. Download the latest `cubeverse` zip from [Releases](https://github.com/Arial-Bold/CubeVerse/releases), copy it to your SD card, and launch `cubeverse.dol` from Swiss or any other DOL loader.
+CubeVerse is unofficial homebrew. It isn't made, endorsed or supported by Pretendo Network or the Juxtaposition team, and it isn't affiliated with Nintendo. Download the latest `cubeverse` zip from [Releases](https://github.com/Arial-Bold/CubeVerse/releases), copy it to your SD card, and launch `cubeverse.dol` from Swiss or any other DOL loader.
 
 You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as the ETH2GC) and a Pretendo Network ID.
 
 ## Features
-
-### The opening and the home cubes
-- Solid blocks fly in through glowing indigo haze, beams of light and drifting dust, and build the CubeVerse logo in 3D. As the last ones land, the light turns green and bursts out from behind the logo. The three logo cubes then glide into place and turn into the home screen's glass cubes. The haze, light and glow are all drawn by the GameCube's graphics chip, with an atmospheric sound of rising wind, a soft heartbeat and a wide chord.
-- Four glass cubes on a ring: **Activity**, **Communities**, **Notifications** and **My page**. Turn the ring with the Control Stick or D-pad: a push turns it straight away (hold to keep turning), and A opens the cube you're turning to. Each cube drifts to its own rhythm, with a square block icon floating inside that changes shape now and then.
-- A soft old-TV look: gentle scanlines, a slight curve and dark edges.
-- Menu sounds and CubeVerse's own mellow background music, made by the GameCube as it plays. After the opening, its sound fades away gently and the music fades in.
-
-### Moving around
-- A pointer, moved with the Control Stick like a mouse (its speed is in Settings). A clicks, the D-pad hops between things and the C-stick scrolls.
-- Lists run off the bottom of the screen into a fading line of light, and more posts load as you scroll.
 
 ### Reading
 - **Activity:** your feed, posts from people you follow, or everyone (My Feed, People, Global).
@@ -59,21 +49,9 @@ You need a network adapter (Broadband Adapter, or a WIZnet-based adapter such as
 | Z | The poster's page (shift when typing, undo when drawing) |
 | START | Settings on the home screen, post when writing or drawing |
 
-## Building
 
-CubeVerse builds with devkitPPC and libogc2. The easiest way is GitHub Actions (see `.github/workflows`), or with Docker:
+## Notes
 
-```
-sh get-deps.sh
-docker run --rm -v "$PWD:/src" -w /src ghcr.io/extremscorner/libogc2:latest make
-```
-
-Copy `cubeverse.dol` and the `sd/cubeverse` folder to your SD card.
-
-The `pc` folder has a test build that runs CubeVerse on a PC against a stand-in for Juxt (`pc/server.py`), for screenshots.
-
-## Thanks
-
-To the Pretendo Network and Juxtaposition teams. CubeVerse isn't affiliated with Nintendo.
+CubeVerse isn't affiliated with Nintendo, or Pretendo Network and Juxtaposition team.
 
 Japanese text uses M PLUS 1p and Noto Sans CJK JP (SIL Open Font License). Every sound and the music are CubeVerse's own, made from scratch.
