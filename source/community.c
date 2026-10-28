@@ -86,7 +86,7 @@ static void draw(float open) {
     cv_title(name[0] ? name : "Community", CV_T_BLUE, page.stat1, 1);
     float x = CV_L + 18, w = UI_W - 2 * x;
     /* header: icon, description, buttons */
-    float hy = 52;   /* one short row (half the old height) */
+    float hy = 60;   /* one short row, with room below the title's line */
     if (page.icon[0]) img_draw_cover(page.icon, IMG_SMALL, x, hy, 22, 22, 1);
     else gfx_rect(x, hy, 22, 22, rgba(0x2F, 0xA6, 0xE0, 255));
     float bx = x + w;
@@ -108,8 +108,8 @@ static void draw(float open) {
     }
     const char *desc = page.desc[0] ? page.desc : (page.state == JS_READY ? "" : " ");
     ui_text_fit_scroll(FONT_MENU, 12, 1.0f, x + 32, hy, bx - 12 - (x + 32), 22, rgba(0xdf, 0xe4, 0xee, 255), desc);
-    cv_tabs(CV_L + 10, 80, TABS, 2, tab, ID_TAB, 1);
-    pl_draw(&list, x, 114, w, CV_BOTTOM, 1);
+    cv_tabs(CV_L + 10, 92, TABS, 2, tab, ID_TAB, 1);
+    pl_draw(&list, x, 126, w, CV_BOTTOM, 1);
     const char *h[] = { "S:Pointer", "LR:Tab", "Y:Post", "B:Back", "A:Open" };
     ui_hints(h, 5, 1, input_stick_dir());
 }

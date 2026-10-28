@@ -77,6 +77,16 @@ static const Tone err[] = { T(220, 214, 0, .01f, .22f, .6f, 1), T(196, 190, .12f
 static const Tone key[] = { T(880, 880, 0, .003f, .08f, .3f, 2) };
 static const Tone loaded[] = { T(524, 524, 0, .01f, .5f, .45f, 2), T(660, 660, .1f, .01f, .5f, .4f, 2), T(784, 784, .2f, .01f, .7f, .4f, 2) };
 
+/* easter eggs (home.c) */
+/* dizzy: a slide whistle wandering up and down, slower and lower as it goes */
+static const Tone dizzy[] = { T(620, 940, 0, .02f, .34f, .45f, 0), T(940, 560, .3f, .02f, .36f, .45f, 0), T(560, 860, .62f, .02f, .38f, .42f, 0),
+                              T(860, 470, .96f, .02f, .5f, .42f, 0), T(470, 330, 1.42f, .03f, .45f, .35f, 0) };
+/* yawn: a long soft fall with breath, then a little contented bell */
+static const Tone yawn[] = { T(470, 290, 0, .3f, 1.0f, .5f, 1), T(705, 440, .02f, .3f, .9f, .14f, 0), T(523, 523, 1.15f, .006f, .5f, .25f, 2) };
+static const Tone poke[] = { T(1250, 1500, 0, .002f, .07f, .45f, 2) };
+static const Tone whee[] = { T(480, 1150, 0, .01f, .38f, .45f, 0), T(720, 1720, .02f, .01f, .36f, .25f, 0), T(1046, 1046, .36f, .004f, .4f, .25f, 2) };
+static const Tone boing[] = { T(260, 640, 0, .003f, .1f, .55f, 2), T(640, 470, .09f, .004f, .3f, .4f, 2) };
+
 #define N(a) (int)(sizeof(a) / sizeof(a[0]))
 static const Recipe recipes[SFX_COUNT] = {
     [SFX_HOVER] = { move1, N(move1), { 0, .002f, .05f, .04f, 2500, 2000 }, .7f, .25f, .55f },
@@ -94,6 +104,11 @@ static const Recipe recipes[SFX_COUNT] = {
     [SFX_ERROR] = { err, N(err), { 0, 0, 0, 0, 1000, 1000 }, .55f, .15f, .55f },
     [SFX_KEY] = { key, N(key), { 0, 0, 0, 0, 1000, 1000 }, .15f, .1f, .35f },
     [SFX_LOADED] = { loaded, N(loaded), { 0, .005f, .1f, .05f, 3000, 2000 }, 1.0f, .3f, .55f },
+    [SFX_DIZZY] = { dizzy, N(dizzy), { 0, 0, 0, 0, 1000, 1000 }, 2.1f, .3f, .5f },
+    [SFX_YAWN] = { yawn, N(yawn), { 0, .35f, 1.0f, .22f, 1800, 600 }, 2.0f, .3f, .5f },
+    [SFX_POKE] = { poke, N(poke), { 0, 0, 0, 0, 1000, 1000 }, .2f, .15f, .35f },
+    [SFX_WHEE] = { whee, N(whee), { 0, .01f, .3f, .1f, 1500, 4000 }, 1.0f, .3f, .5f },
+    [SFX_BOING] = { boing, N(boing), { 0, 0, 0, 0, 1000, 1000 }, .55f, .2f, .45f },
 };
 
 /* ---------------------------------------------------------------- tools */

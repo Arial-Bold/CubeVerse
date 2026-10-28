@@ -2,7 +2,13 @@
  * of CubeVerse (Activity, Communities, Notifications, My page). The stick
  * turns the ring; the cube at the front is bigger, the ones beside it
  * smaller and the one at the back smaller still and dimmer. Each cube drifts
- * to its own rhythm. */
+ * to its own rhythm.
+ *
+ * Three little secrets: spin the ring round and round (20 turns the same
+ * way, quickly) and the cubes get dizzy; leave the controller alone for five
+ * minutes and they doze off, with blocky Z's floating up, and wake with a
+ * yawn; poke the logo with Y ten times and its three cubes tumble out and
+ * bounce away. */
 #include "app.h"
 #include "home.h"
 #include "vcube.h"
@@ -18,6 +24,7 @@
 #include "m3d.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char *const NAMES[4] = { "Activity", "Communities", "Notifications", "My page" };
@@ -82,6 +89,183 @@ static void home_enter(const char *arg, bool back) {
     if (from_splash && g_set.update_auto && update_state() == UPD_NONE) update_request_check(true);
 }
 
+/* ------------------------------------------------------------ easter eggs */
+
+#define DIZZY_TURNS 20      /* turns the same way, each within DIZZY_GAP of the last */
+#define DIZZY_GAP 1.0f
+#define DIZZY_S 4.5f
+#define SLEEP_AFTER 300.0f  /* seconds without a touch */
+#define POKES 10            /* Y presses on the logo, each within POKE_GAP of the last */
+#define POKE_GAP 2.5f
+
+static int spin_dir, spin_count;
+static float spin_last = -10, dizzy_t;          /* dizzy_t: seconds of dizziness left */
+static float idle_t, sleepy;                     /* sleepy: 0 awake .. 1 fast asleep */
+static float zzz_next;
+typedef struct { float x, y, t, life; bool on; } Zz;
+static Zz zz[6];
+static int pokes;
+static float poke_last = -10, wiggle_t = -1;
+typedef struct { float x, y, vx, vy, ang, spin, size; Color c; bool on; } Tumbler;
+static Tumbler tumblers[3];
+static float logo_gone_t = -1;                   /* the logo's cubes are out: seconds since */
+
+static void egg_turned(int dir) {
+    if (dir == spin_dir && g_time - spin_last < DIZZY_GAP) spin_count++;
+    else spin_count = 1;
+    spin_dir = dir;
+    spin_last = g_time;
+    if (spin_count >= DIZZY_TURNS && dizzy_t <= 0) {
+        dizzy_t = DIZZY_S;
+        spin_count = 0;
+        sound_play(SFX_DIZZY);
+    }
+}
+
+static float dizzy_amount(void) {
+    if (dizzy_t <= 0) return 0;
+    float in = clamp01((DIZZY_S - dizzy_t) / 0.4f), out = clamp01(dizzy_t / 1.5f);
+    return in * out;
+}
+
+static void poke_logo(void) {
+    if (logo_gone_t >= 0) return;
+    if (g_time - poke_last < POKE_GAP) pokes++;
+    else pokes = 1;
+    poke_last = g_time;
+    wiggle_t = 0;
+    sound_play(SFX_POKE);
+    if (pokes >= POKES) {
+        pokes = 0;
+        logo_gone_t = 0;
+        sound_play(SFX_WHEE);
+        /* the three cubes pop out of the mark and tumble off to the right */
+        static const Color C[3] = { { 0xF2, 0xF5, 0xFF, 255 }, { 0x9C, 0xE0, 0x7E, 255 }, { 0x8E, 0xD1, 0xFF, 255 } };
+        for (int i = 0; i < 3; i++) {
+            Tumbler *b = &tumblers[i];
+            b->on = true;
+            b->x = 30 + i * 14;
+            b->y = 34;
+            b->vx = 110 + i * 55;
+            b->vy = -260 - i * 40;
+            b->ang = 0;
+            b->spin = 4 + i * 2.5f;
+            b->size = i == 1 ? 18 : 14;
+            b->c = C[i];
+        }
+    }
+}
+
+static void eggs_update(bool touched) {
+    if (dizzy_t > 0) dizzy_t -= g_dt;
+    /* sleep */
+    if (touched) {
+        if (sleepy > 0.5f) sound_play(SFX_YAWN);
+        idle_t = 0;
+    } else {
+        idle_t += g_dt;
+    }
+    float after = SLEEP_AFTER;
+#ifdef PC_TEST
+    if (getenv("CV_SLEEP_AFTER")) after = (float)atof(getenv("CV_SLEEP_AFTER"));   /* (screenshots) */
+#endif
+    float want = idle_t > after ? 1 : 0;
+    sleepy += (want - sleepy) * clamp01(g_dt * (want > sleepy ? 0.6f : 4.0f));
+    if (sleepy > 0.6f && g_time > zzz_next) {
+        zzz_next = g_time + 1.5f;
+        for (int i = 0; i < 6; i++)
+            if (!zz[i].on) { zz[i] = (Zz){ gfx_width() / 2 + 34, home_center_y() - 70, 0, 4.0f, true }; break; }
+    }
+    for (int i = 0; i < 6; i++)
+        if (zz[i].on && (zz[i].t += g_dt) > zz[i].life) zz[i].on = false;
+    /* the logo's cubes */
+    if (wiggle_t >= 0 && (wiggle_t += g_dt) > 0.35f) wiggle_t = -1;
+    if (logo_gone_t >= 0) {
+        logo_gone_t += g_dt;
+        float floor_y = 50, W = gfx_width();
+        bool any = false;
+        for (int i = 0; i < 3; i++) {
+            Tumbler *b = &tumblers[i];
+            if (!b->on) continue;
+            b->vy += 900 * g_dt;
+            b->x += b->vx * g_dt;
+            b->y += b->vy * g_dt;
+            b->ang += b->spin * g_dt;
+            if (b->y > floor_y - b->size / 2 && b->vy > 0) {
+                b->y = floor_y - b->size / 2;
+                if (b->vy > 120) sound_play(SFX_BOING);
+                b->vy *= -0.62f;
+                b->spin *= 0.8f;
+            }
+            if (b->x > W + 40) b->on = false;
+            else any = true;
+        }
+        if (!any && logo_gone_t > 6) logo_gone_t = -1;   /* the logo has grown back */
+    }
+}
+
+/* a small smiling cube, turned by ang */
+static void draw_tumbler(const Tumbler *b, float al) {
+    float c = cosf(b->ang), sn = sinf(b->ang), h = b->size / 2;
+    float q[8];
+    static const float K[4][2] = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } };
+    for (int k = 0; k < 4; k++) {
+        float x = K[k][0] * h, y = K[k][1] * h;
+        q[k * 2] = b->x + x * c - y * sn;
+        q[k * 2 + 1] = b->y + x * sn + y * c;
+    }
+    Color top = color_alpha(b->c, al), bot = rgba((u8)(b->c.r * 0.75f), (u8)(b->c.g * 0.75f), (u8)(b->c.b * 0.75f), (u8)(255 * al));
+    Color c4[4] = { top, top, bot, bot };
+    gfx_quad_colors(q, c4);
+    /* eyes and a smile */
+    Color ink = rgba(0x2A, 0x2F, 0x45, (u8)(255 * al));
+    float pts[3][2] = { { -0.4f, -0.25f }, { 0.4f, -0.25f }, { 0, 0.35f } };
+    for (int k = 0; k < 3; k++) {
+        float x = pts[k][0] * h, y = pts[k][1] * h;
+        float px = b->x + x * c - y * sn, py = b->y + x * sn + y * c;
+        float r = k < 2 ? b->size * 0.09f : b->size * 0.12f;
+        gfx_rect(px - r, py - r, r * 2, r * 2, ink);
+    }
+}
+
+/* a blocky "Z", made of small squares */
+static void draw_z(float x, float y, float cell, Color c) {
+    /* ###
+     *  #
+     * #
+     * ### */
+    for (int i = 0; i < 3; i++) gfx_rect(x + i * cell, y, cell - 1, cell - 1, c);
+    gfx_rect(x + 1 * cell, y + cell, cell - 1, cell - 1, c);
+    gfx_rect(x + 0 * cell, y + 2 * cell, cell - 1, cell - 1, c);
+    for (int i = 0; i < 3; i++) gfx_rect(x + i * cell, y + 3 * cell, cell - 1, cell - 1, c);
+}
+
+static void eggs_draw(float al) {
+    /* Z's from the front cube */
+    for (int i = 0; i < 6; i++) {
+        if (!zz[i].on) continue;
+        float k = zz[i].t / zz[i].life;
+        float a = clamp01(k / 0.15f) * clamp01((1 - k) / 0.35f) * sleepy * al;
+        float x = zz[i].x + k * 40 + sinf(zz[i].t * 2.2f) * 8, y = zz[i].y - k * 110;
+        float cell = 6 + k * 4;
+        draw_z(x, y, cell, rgba(0xDD, 0xE6, 0xFF, (u8)(235 * a)));
+    }
+    /* dizzy: little stars circling over the front cube */
+    float d = dizzy_amount();
+    if (d > 0) {
+        float cx = gfx_width() / 2, cy = home_center_y() - 104;
+        for (int i = 0; i < 5; i++) {
+            float a = g_time * 4.2f + i * 6.2832f / 5;
+            float x = cx + cosf(a) * 60, y = cy + sinf(a) * 14;
+            float s = 4 + 2 * (0.5f + 0.5f * sinf(a));
+            Color c = rgba(0xFF, 0xE0, 0x6A, (u8)(255 * d * al));
+            gfx_rect(x - s / 2, y - s * 1.5f, s, s * 3, c);
+            gfx_rect(x - s * 1.5f, y - s / 2, s * 3, s, c);
+        }
+    }
+    for (int i = 0; i < 3; i++) if (tumblers[i].on) draw_tumbler(&tumblers[i], al);
+}
+
 static void open_section(int i) {
     sound_play(SFX_OPEN);
     g_home_section = i;
@@ -105,6 +289,14 @@ static void home_update(void) {
         snprintf(m, sizeof(m), "CubeVerse %s is available. Press Z to see what's new.", update_latest_version());
         app_toast(m);
     }
+    {
+        bool touched = input_any() || fabsf(input_stick_x()) > 0.3f || fabsf(input_stick_y()) > 0.3f ||
+                       fabsf(input_cstick_x()) > 0.3f || fabsf(input_cstick_y()) > 0.3f;
+        bool was_asleep = sleepy > 0.3f;
+        eggs_update(touched);
+        if (was_asleep && touched) { idle_t = 0; return; }   /* the first touch only wakes them */
+    }
+    if (input_pressed(BTN_Y)) poke_logo();
     /* turning. A push starts a turn at once, even in the middle of one: the
      * ring sets off again from wherever it is (the easing starts quickly and
      * lands softly, so chained turns run together smoothly). Holding the
@@ -133,6 +325,7 @@ static void home_update(void) {
             if (turn_from - target > 1.6f) target = (int)lroundf(turn_from) - 1;
             turn_t = 0;
             sound_play(SFX_TURN_SIDE);
+            egg_turned(d);
             return;
         }
     }
@@ -163,7 +356,9 @@ static void home_update(void) {
 
 void home_draw_header(float al) {
     if (al <= 0) return;
-    logo_mark_draw(26, 22, 34, al);
+    float lw = wiggle_t >= 0 ? sinf(wiggle_t / 0.35f * 3.1416f) * 4 : 0;
+    float la = logo_gone_t < 0 ? 1 : clamp01((logo_gone_t - 4.5f) / 1.5f);   /* grows back after a while */
+    if (la > 0) logo_mark_draw(26, 22 - lw, 34, al * la);
     ui_text(FONT_CUBE, 21, 0.2f, 26 + logo_mark_width(34) + 8, 20, 38, rgba(0xEE, 0xF0, 0xFF, (u8)(255 * al)), "CubeVerse");
     float rx = gfx_width() - 22;
     if (juxt_signed_in()) {
@@ -211,6 +406,18 @@ void home_draw_cubes(float ring_pos, float time, float al, int skip_mask) {
         VCube v;
         home_cube_setup(&v, i, (i - ring_pos) * 90, time);
         v.alpha *= al;
+        float dz = dizzy_amount();
+        if (dz > 0 || sleepy > 0.001f) {
+            /* dizzy: wobbling and swaying off balance; asleep: sunk a little and dim */
+            v.sway = (1 - sleepy) * (1 - dz);
+            v.ax = VC_BASE_X + dz * 14 * sinf(g_time * 7.0f + i) + sleepy * 8;
+            v.ay = VC_BASE_Y + dz * 18 * sinf(g_time * 5.3f + i * 1.7f);
+            v.az = VC_BASE_Z + dz * 16 * sinf(g_time * 6.1f + i * 2.3f);
+            v.cx += dz * 12 * sinf(g_time * 3.1f + i);
+            v.cy += sleepy * 26 + dz * 6 * sinf(g_time * 4.4f + i);
+            v.alpha *= 1 - 0.45f * sleepy;
+            v.icon_alpha *= 1 - 0.6f * sleepy;
+        }
         vcube_draw(&v);
     }
 }
@@ -234,6 +441,7 @@ static void home_draw(float open) {
     float t = g_time;
     cv_background(1);
     home_draw_cubes(ring, t, 1, 0);
+    eggs_draw(1);
     home_draw_header(1);
     home_draw_labels(ring, 1);
     float hints = settings_panel_active() || update_panel_active() ? 0 : 1;

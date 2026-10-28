@@ -47,6 +47,8 @@ static void enter(const char *arg, bool back) {
     juxt_saved_login(user, sizeof(user), pass, sizeof(pass));
     kbd_init(&kuser, user, sizeof(user));
     kbd_init(&kpass, pass, sizeof(pass));
+    kuser.ok_label = "Next";
+    kpass.ok_label = "Sign in";
     kuser.no_space = kpass.no_space = true;
     field = -1;
     res.state = JS_IDLE;
@@ -116,6 +118,9 @@ static void update(void) {
     }
     if (field == 0) kbd_update(&kuser, c, ID_KEYS);
     else if (field == 1) kbd_update(&kpass, c, ID_KEYS);
+    /* the keyboard's OK key: on to the password, then sign in */
+    if (kuser.ok) { kuser.ok = false; sound_play(SFX_SELECT); field = 1; }
+    if (kpass.ok) { kpass.ok = false; go(); }
 }
 
 static void field_box(int id, const char *label, Kbd *k, float x, float y, float w, bool focused, bool mask) {
@@ -188,7 +193,7 @@ static void draw(float open) {
         kbd_draw(field == 0 ? &kuser : &kpass, x + (w - kw) / 2, cy + ch + 18, kw, 40, 7, ID_KEYS, 1);
     }
     if (field >= 0) {
-        const char *h[] = { "A:Type", "X:Delete", "Z:Shift", "ST:Sign in", "B:Done" };
+        const char *h[] = { "A:Type", "X:Delete", "LR:Cursor", "ST:Sign in", "B:Done" };
         ui_hints(h, 5, 1, -1);
     } else {
         const char *h[] = { "S:Pointer", "A:Type", "ST:Sign in", "B:Back" };

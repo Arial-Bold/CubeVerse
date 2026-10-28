@@ -22,20 +22,20 @@
 
 enum { S_SCREEN, S_WIDTH, S_MARGIN, S_VIDEO, S_INTRO, S_POINTER, S_SOUNDS, S_VOLUME, S_MENU_MUSIC, S_MUSIC, S_ACCOUNT,
        S_UPDATE, S_UPDATE_AUTO, S_EXIT_ACTION, S_EXIT_DOL, S_EXIT, SN };
-static const char *const labels[SN] = { "Screen", "Picture width", "Screen margin", "Video", "Opening animation", "Pointer speed",
+static const char *const labels[SN] = { "Screen", "Picture width", "Overscan", "Resolution", "Opening animation", "Pointer speed",
                                         "Menu sounds", "Sound volume", "Menu music", "Music volume", "Pretendo account",
                                         "Software update", "Check for updates at start", "Exit button",
                                         "Program to start", "Exit now" };
 static const char *const help[SN] = {
     "4:3 for most TVs, 16:9 for widescreen TVs set to stretch the picture.",
     "Full uses the whole width of the TV picture (704 pixels). Standard is 640.",
-    "Moves everything in from the edges if your TV cuts them off. The gold corners show where the picture ends.",
+    "Moves everything in from the edges if your TV cuts them off (overscan). The gold corners show where the picture ends.",
     "480p needs component or digital video cables. Auto picks it when they're connected.",
     "Turn off to go straight to the home cubes when CubeVerse starts.",
     "How fast the pointer moves with the stick. Lower is slower and easier to place.",
     "The little sounds when you move around the menus.",
     "How loud the menu sounds are.",
-    "CubeVerse's own background music, the same as Flashcube's.",
+    "CubeVerse's own mellow background music.",
     "How loud the background music is.",
     "The Pretendo Network ID CubeVerse uses for Juxt. Press A twice to sign out (or A to sign in).",
     "Press A to see if there's a new version of CubeVerse on GitHub, and what's new in it.",

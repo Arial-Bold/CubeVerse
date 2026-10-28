@@ -24,3 +24,5 @@ void compose_sending_draw(float alpha);
 void compose_tabs(int on, int base);
 /* The feelings as a row (horizontal) or a column, ids base..base+5. */
 void compose_feelings(float x, float y, float box_w, float box_h, float gap, bool column, int on, int base, float alpha);
+/* The feelings as a grid of bigger buttons, each with its name. */
+void compose_feelings_grid(float x, float y, int cols, float box_w, float box_h, float gap, int on, int base, float alpha);

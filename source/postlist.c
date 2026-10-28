@@ -26,6 +26,9 @@ void pl_reset_scroll(PostList *pl) { pl->scroll = pl->target = 0; }
 
 /* ------------------------------------------------------------- one card */
 
+/* set while a comment under an open post is drawn */
+static bool card_is_comment;
+
 #define PAD 14.0f
 #define FACE 42.0f
 #define TEXT_SIZE 14.0f
@@ -103,9 +106,12 @@ float pl_card(const JPost *p, float x, float y, float w, bool hot, bool yeah_hot
     yeah_label(p, yl, sizeof(yl));
     float pw2 = cv_pill(cx, fy, 0, FOOT, yl, p->yeahed ? CV_YEAH : rgba(0xEE, 0xF1, 0xF8, 255),
                         p->yeahed ? rgba(255, 255, 255, 255) : rgba(0x4A, 0x51, 0x70, 255), yeah_hot, al);
-    char rep[32];
-    snprintf(rep, sizeof(rep), p->replies == 1 ? "1 comment" : "%d comments", p->replies);
-    ui_text(FONT_ROUND, 12, 0, cx + pw2 + 10, fy, FOOT, ink2, rep);
+    /* (a comment can't have comments of its own on Juxt, so it shows no count) */
+    if (!card_is_comment) {
+        char rep[32];
+        snprintf(rep, sizeof(rep), p->replies == 1 ? "1 comment" : "%d comments", p->replies);
+        ui_text(FONT_ROUND, 12, 0, cx + pw2 + 10, fy, FOOT, ink2, rep);
+    }
     return h;
 }
 
@@ -219,7 +225,7 @@ void pl_update(PostList *pl) {
             JPost *p = &pg->posts[i];
             if (part == 1) pl_yeah(pl, i);
             else if (part == 2) { sound_play(SFX_SELECT); char a[16]; snprintf(a, sizeof(a), "%d", p->pid); app_go(SCR_USER, a); }
-            else { sound_play(SFX_SELECT); app_go(SCR_POST, p->id); }
+            else if (!(pl->big_first && i > 0)) { sound_play(SFX_SELECT); app_go(SCR_POST, p->id); }
         }
     }
     if (o >= 0) {
@@ -258,6 +264,7 @@ void pl_draw(PostList *pl, float x, float y, float w, float bottom, float al) {
         for (int i = pl->big_first ? 0 : pl->first; i < pg->nposts; i++) {
             JPost *p = &pg->posts[i];
             bool big = pl->big_first && i == 0;
+            card_is_comment = pl->big_first && i > 0;
             if (pl->big_first && i == 1) {
                 /* the comments under the post */
                 if (yy > y - 30 && yy < bottom)
@@ -271,17 +278,20 @@ void pl_draw(PostList *pl, float x, float y, float w, float bottom, float al) {
                 float vy = yy < y ? y : yy, vb = yy + h > bottom ? bottom : yy + h;
                 bool hot = false, yhot = false;
                 if (vb > vy) {
-                    hot = ptr_hot(pl->id_base + i * 4, x, vy, w, vb - vy);
+                    /* a comment isn't opened (nothing more to see, and it can't
+                     * be commented on); its Yeah and its poster's face still work */
+                    if (!card_is_comment) hot = ptr_hot(pl->id_base + i * 4, x, vy, w, vb - vy);
                     float bx, by, bw, bh;
                     pl_card_yeah_box(p, x, yy, w, pl->show_community, big, &bx, &by, &bw, &bh);
                     if (by >= y && by + bh <= bottom) yhot = ptr_hot(pl->id_base + i * 4 + 1, bx, by, bw, bh);
                     float fy = yy + 12;
                     if (fy >= y && fy + 42 <= bottom) ptr_hot(pl->id_base + i * 4 + 2, x + PAD, fy, big ? 44 : FACE, big ? 44 : FACE);
                 }
-                pl_card(p, x, yy, w, hot || over == i, yhot, pl->show_community, big, true, al);
+                pl_card(p, x, yy, w, hot || (over == i && !card_is_comment), yhot, pl->show_community, big, true, al);
             }
             yy += h + 12;
         }
+        card_is_comment = false;
     } else {
         int cols = pl->cols;
         float gap = 14, tw = (w - gap * (cols - 1)) / cols;

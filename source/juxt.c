@@ -266,6 +266,7 @@ static const char *page_path(JPageKind k, const char *arg, char *buf, size_t cap
     case JP_POST: snprintf(buf, cap, "/posts/%s", arg); return buf;
     case JP_USER_POSTS: snprintf(buf, cap, "/users/%s", arg[0] ? arg : "me"); return buf;
     case JP_USER_YEAHS: snprintf(buf, cap, "/users/%s/yeahs", arg[0] ? arg : "me"); return buf;
+    case JP_USER_FOLLOWERS: snprintf(buf, cap, "/users/%s/followers", arg[0] ? arg : "me"); return buf;
     case JP_NEWS: return "/news/my_news";
     default: return "/";
     }
@@ -291,6 +292,16 @@ static void fill_page(JPage *out, JPageKind kind, const char *html, size_t len) 
             if (m) out->pid = atoi(m + 5);
         }
         out->nposts = jp_parse_posts(html, len, out->posts, JPAGE_POSTS, out->next, sizeof(out->next));
+        break;
+    case JP_USER_FOLLOWERS:
+        jp_parse_header(html, len, out);
+        out->pid = 0;
+        {
+            const char *m = strstr(out->icon, "/mii/");
+            if (m) out->pid = atoi(m + 5);
+        }
+        out->nposts = 0;
+        out->ncomms = jp_parse_people(html, len, out->comms, JPAGE_COMMUNITIES);
         break;
     default:
         out->nposts = jp_parse_posts(html, len, out->posts, JPAGE_POSTS, out->next, sizeof(out->next));

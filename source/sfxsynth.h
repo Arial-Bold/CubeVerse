@@ -18,6 +18,11 @@ typedef enum {
     SFX_START,        /* (no longer played: the opening's clip has its own chord) */
     SFX_CLOSE, SFX_ERROR, SFX_KEY, SFX_LOADED,
     SFX_ASSEMBLE,     /* the opening: the haze, the light and the logo's chord */
+    SFX_DIZZY,        /* home cubes turned round and round: a woozy slide whistle */
+    SFX_YAWN,         /* home cubes waking up */
+    SFX_POKE,         /* the logo poked */
+    SFX_WHEE,         /* the logo's cubes tumbling out */
+    SFX_BOING,        /* one of them bouncing */
     SFX_COUNT
 } Sfx;
 

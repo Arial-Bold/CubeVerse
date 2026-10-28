@@ -1,7 +1,8 @@
-/* keyboard.h - the on-screen keyboard (signing in, writing posts): white
- * square keys you point at with the hand and press with A, a shift key, a
- * symbols page, space and delete. X deletes, Y types a space, L and R move
- * the text cursor, Z switches shift. */
+/* keyboard.h - the on-screen keyboard (signing in, writing posts), laid out
+ * like the Wii U's with a row of numbers above the letters: white square
+ * keys on a light panel that you point at and press with A, shift and caps,
+ * a symbols page, space, delete, return and an OK key. X deletes, Y types a
+ * space, L and R move the text cursor, Z switches shift. */
 #pragma once
 #include <stdbool.h>
 
@@ -13,6 +14,8 @@ typedef struct {
     bool  caps;         /* shift pressed twice: capitals until pressed again */
     bool  symbols;
     bool  no_space;     /* sign-in names */
+    const char *ok_label;   /* the OK key's word ("OK", "Post", "Next"...) */
+    bool  ok;           /* the OK key was pressed (cleared by whoever acts on it) */
 } Kbd;
 
 void kbd_init(Kbd *k, char *buf, int cap);

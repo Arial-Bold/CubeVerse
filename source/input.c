@@ -55,6 +55,16 @@ void input_update(void) {
 #else
     held = test_held; sx = test_sx; sy = test_sy; tl = test_tl; tr = test_tr;
 #endif
+    /* L and R count as pressed once the trigger is about halfway down, not
+     * only at the click at the very bottom (a light squeeze works, and
+     * the cursor and tabs respond sooner) */
+    {
+        static bool l_on, r_on;
+        l_on = l_on ? tl > 0.35f : tl > 0.5f;
+        r_on = r_on ? tr > 0.35f : tr > 0.5f;
+        if (l_on) held |= BTN_L;
+        if (r_on) held |= BTN_R;
+    }
     pressed_now = (held & ~prev) | injected;
     injected = 0;
     for (int b = 0; b < 16; b++) {

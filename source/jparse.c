@@ -136,6 +136,34 @@ int jp_parse_communities(const char *html, size_t len, JCommunity *out, int cap,
     return n;
 }
 
+int jp_parse_people(const char *html, size_t len, JCommunity *out, int cap) {
+    const char *end = html + len;
+    const char *ul = html_find_class(html, end, "ul", "accounts");
+    if (!ul) return 0;
+    const char *ue = html_elem_end(ul, end), *p = ul + 1;
+    int n = 0;
+    char v[256];
+    while (n < cap && (p = html_find_tag(p, ue, "li")) != NULL) {
+        const char *e = html_elem_end(p, ue);
+        JCommunity *c = &out[n];
+        memset(c, 0, sizeof(*c));
+        const char *a = html_find_tag(p, e, "a");
+        /* people only (the "following" list also has communities) */
+        if (a && html_attr(a, "href", v, sizeof(v)) && !strncmp(v, "/users/", 7)) {
+            const char *id = v + 7;
+            if (!strncmp(id, "show?pid=", 9)) id += 9;
+            snprintf(c->id, sizeof(c->id), "%.*s", (int)strcspn(id, "/?&"), id);
+            const char *img = html_find_tag(p, e, "img");
+            if (img) { html_attr(img, "src", c->icon, sizeof(c->icon)); jp_absolute(c->icon, sizeof(c->icon)); }
+            const char *nm = html_find_class(p, e, NULL, "nick-name");
+            if (nm) html_inner_text(nm, e, c->name, sizeof(c->name));
+            if (c->id[0] && atoi(c->id) > 0) n++;
+        }
+        p = e;
+    }
+    return n;
+}
+
 int jp_parse_news(const char *html, size_t len, JNews *out, int cap, char *next, size_t next_cap) {
     const char *end = html + len, *p = html;
     int n = 0;
@@ -204,7 +232,7 @@ void jp_parse_header(const char *html, size_t len, JPage *pg) {
         if (nm) html_inner_text(nm, end, name, sizeof(name));
         if (strstr(name, "ollower")) snprintf(pg->stat1, sizeof(pg->stat1), "%.20s followers", val);
         else if (strstr(name, "ost") && !pg->stat2[0]) snprintf(pg->stat2, sizeof(pg->stat2), "%.20s posts", val);
-        else if (strstr(name, "ountry") && !pg->stat2[0]) snprintf(pg->stat2, sizeof(pg->stat2), "%.38s", val);
+        else if (strstr(name, "ountry") && !pg->stat2[0]) snprintf(pg->stat2, sizeof(pg->stat2), "%.28s|country", val);
         p = ve;
         k++;
     }

@@ -78,6 +78,23 @@ void compose_feelings(float x, float y, float bw, float bh, float gap, bool colu
     }
 }
 
+/* the feelings as a grid of bigger buttons, each face with its name under it */
+void compose_feelings_grid(float x, float y, int cols, float bw, float bh, float gap, int on, int base, float al) {
+    static const char *const NAMES[6] = { "Normal", "Happy", "Wink", "Surprised", "Frustrated", "Puzzled" };
+    for (int i = 0; i < 6; i++) {
+        float fx = x + (i % cols) * (bw + gap), fy = y + (i / cols) * (bh + gap);
+        bool hot = ptr_hot(base + i, fx, fy, bw, bh);
+        bool sel = i == on;
+        gfx_rect(fx, fy + 2, bw, bh, rgba(0, 0, 0, (u8)(0.45f * 255 * al)));
+        gfx_rect(fx, fy, bw, bh, sel ? color_alpha(CV_YEAH, al) : rgba(255, 255, 255, (u8)(255 * al)));
+        Color ink = sel ? rgba(255, 255, 255, 255) : rgba(0x4A, 0x51, 0x70, 255);
+        cv_feeling(i, fx + bw / 2, fy + bh / 2 - 6, bh * 0.27f, ink, al);
+        ui_text_center(FONT_MENU_BOLD, 9, 0.6f, fx + bw / 2, fy + bh - 15, 12,
+                       sel ? rgba(255, 255, 255, (u8)(255 * al)) : rgba(0x6A, 0x71, 0x90, (u8)(255 * al)), NAMES[i]);
+        if (hot) ui_gold_ring(fx, fy, bw, bh, 0.5f + 0.5f * sinf(g_time * 4), al);
+    }
+}
+
 /* ---------------------------------------------------------- the screen */
 
 static PostTarget target;
@@ -99,6 +116,7 @@ static void enter(const char *arg, bool back) {
     post_target_parse(&target, arg);
     text[0] = 0;
     kbd_init(&kbd, text, sizeof(text));
+    kbd.ok_label = "Post";
     feeling = 0;
     spoiler = false;
     send.state = JS_IDLE;
@@ -148,6 +166,7 @@ static void update(void) {
         return;
     }
     kbd_update(&kbd, c, ID_KEYS);
+    if (kbd.ok) { kbd.ok = false; post(); }
 }
 
 /* the text, wrapped, with the cursor; scrolled so the cursor's line shows */
@@ -188,27 +207,24 @@ static void draw(float open) {
     compose_tabs(0, ID_TAB);
     float x = cv_side(), w = UI_W - 2 * x;
     draw_text(x, 54, w, 88, 1);
-    /* feelings, spoilers, post */
-    float ry = 152;
-    ui_text(FONT_MENU, 12, 1.2f, x, ry, 30, COL_SOFT, "Feeling");
-    compose_feelings(x + 64, ry, 34, 30, 8, false, feeling, ID_FEEL, 1);
+    /* the count, in the text box's corner */
     char cnt[16];
     snprintf(cnt, sizeof(cnt), "%d / %d", (int)strlen(text), MAX_TEXT);
-    float pw = gfx_text_width(FONT_ROUND, 13, "Post", -1) + 36;
-    float px = x + w - pw;
-    bool hp = ptr_hot(ID_POST, px, ry, pw, 30);
-    cv_pill(px, ry, pw, 30, "Post", rgba(0x29, 0xA8, 0xE0, 255), rgba(255, 255, 255, 255), hp, 1);
+    ui_text_right(FONT_ROUND, 11, 0, x + w - 10, 54 + 88 - 20, 16, CV_INK2, cnt);
+    /* feelings at the left, in two columns, and the spoilers switch under them */
+    float fy = 168, bw = 54, bh = 48, fg = 6;
+    ui_text(FONT_MENU_BOLD, 11, 1.2f, x, fy - 18, 16, COL_SOFT, "Feeling");
+    compose_feelings_grid(x, fy, 2, bw, bh, fg, feeling, ID_FEEL, 1);
     const char *sp = spoiler ? "Spoilers: on" : "Spoilers: off";
-    float sw = gfx_text_width_sp(FONT_MENU, 12, 1.2f, sp, -1) + 16;
-    float sx = px - 10 - sw;
-    bool hs = ptr_hot(ID_SPOIL, sx, ry, sw, 30);
-    if (hs) gfx_rect(sx, ry, sw, 30, rgba(140, 160, 180, 50));
-    ui_text(FONT_MENU, 12, 1.2f, sx + 8, ry, 30, spoiler ? CV_T_ORANGE : COL_SOFT, sp);
-    ui_text_right(FONT_MENU, 11, 1.0f, sx - 12, ry, 30, COL_SOFT, cnt);
-    /* keyboard */
-    float kw = w > 560 ? 560 : w;
-    kbd_draw(&kbd, x + (w - kw) / 2, 194, kw, 38, 6, ID_KEYS, 1);
-    const char *h[] = { "A:Type", "X:Delete", "Y:Space", "Z:Shift", "ST:Post", "B:Cancel" };
+    float sy = fy + 3 * (bh + fg) + 6, sw = 2 * bw + fg;
+    bool hs = ptr_hot(ID_SPOIL, x, sy, sw, 28);
+    if (hs) gfx_rect(x, sy, sw, 28, rgba(140, 160, 180, 50));
+    ui_text(FONT_MENU_BOLD, 11, 1.2f, x + 4, sy, 26, spoiler ? CV_T_ORANGE : COL_SOFT, sp);
+    gfx_rect(x, sy + 26, sw, 2, spoiler ? CV_T_ORANGE : rgba(60, 70, 100, 255));
+    /* the keyboard beside them (its OK key posts) */
+    float kx = x + sw + 12;
+    kbd_draw(&kbd, kx, 150, x + w - kx, 34, 5, ID_KEYS, 1);
+    const char *h[] = { "A:Type", "X:Delete", "Y:Space", "LR:Cursor", "ST:Post", "B:Cancel" };
     ui_hints(h, 6, 1, -1);
     compose_sending_draw(send.state == JS_LOADING ? 1 : 0);
 }

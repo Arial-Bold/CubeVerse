@@ -62,7 +62,22 @@ static void hop(int dir) {
         float score = along + fabsf(side) * 2.5f;
         if (score < best) { best = score; bx = hx; by = hy; }
     }
-    if (best < 1e9f) { px = bx; py = by; }
+    if (best < 1e9f) { px = bx; py = by; return; }
+    /* nothing further that way: going left or right, wrap round to the far
+     * end of the same row (on the keyboard, right from P comes back to Q) */
+    if (dir != DIR_LEFT && dir != DIR_RIGHT) return;
+    int on = hit(list, n, px, py);
+    float row_h = 24;
+    for (int i = 0; i < n; i++) if (list[i].id == on) row_h = list[i].h;
+    float far = 0;
+    bool found = false;
+    for (int i = 0; i < n; i++) {
+        float hx = list[i].x + list[i].w / 2, hy = list[i].y + list[i].h / 2;
+        if (fabsf(hy - py) > row_h * 0.5f || list[i].id == on) continue;
+        float d = dir == DIR_RIGHT ? px - hx : hx - px;   /* how far back the other way */
+        if (d > far) { far = d; bx = hx; by = hy; found = true; }
+    }
+    if (found) { px = bx; py = by; }
 }
 
 void ptr_update(void) {

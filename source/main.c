@@ -114,7 +114,7 @@ static void draw_toast(void) {
     if (a <= 0) return;
     float w = gfx_text_width_sp(FONT_MENU, 14, 1.2f, toast, -1) + 40;
     if (w > gfx_width() - 40) w = gfx_width() - 40;
-    float x = gfx_width() / 2 - w / 2, y = 4;
+    float x = gfx_width() / 2 - w / 2, y = 22;   /* clear of the top edge (TVs cut a little off) */
     ui_desc(x, y, w, 34, a);
     ui_text_fit_scroll(FONT_MENU, 14, 1.2f, x + 20, y, w - 40, 34, rgba(0xec, 0xeb, 0xff, (u8)(255 * a)), toast);
 }

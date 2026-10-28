@@ -56,6 +56,7 @@ typedef enum {
     JP_POST,                  /* arg: post id; posts[0] is the post, the rest replies */
     JP_USER_POSTS,            /* arg: pid or "me" */
     JP_USER_YEAHS,
+    JP_USER_FOLLOWERS,        /* arg: pid or "me"; comms[] holds the people (id: pid) */
     JP_NEWS,
 } JPageKind;
 
@@ -142,6 +143,8 @@ void juxt_post_drawing(JResult *r, const char *community_id, const char *reply_t
 /* Parsers (also used by the PC tests). */
 int  jp_parse_posts(const char *html, size_t len, JPost *out, int cap, char *next, size_t next_cap);
 int  jp_parse_communities(const char *html, size_t len, JCommunity *out, int cap, int *npopular);
+/* A list of people (followers): id is the pid, name the Mii name, icon the face. */
+int  jp_parse_people(const char *html, size_t len, JCommunity *out, int cap);
 int  jp_parse_news(const char *html, size_t len, JNews *out, int cap, char *next, size_t next_cap);
 void jp_parse_header(const char *html, size_t len, JPage *pg);
 /* the toast on the sign-in page ("Password was incorrect."), or "" */
