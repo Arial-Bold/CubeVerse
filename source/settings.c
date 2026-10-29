@@ -15,7 +15,7 @@ static const Key keys[] = {
     I("net.dhcp", dhcp, 0, 1), S("net.ip", ip), S("net.netmask", netmask), S("net.gateway", gateway),
     S("net.dns", dns), I("net.port", http_port, 1, 65535),
     I("display.video", video_mode, 0, 2), I("display.widescreen", widescreen, 0, 1),
-    I("display.full_width", full_width, 0, 1), I("display.margin", margin, 0, 12), I("display.intro", intro, 0, 1), I("control.pointer_speed", pointer_speed, 1, 10),
+    I("display.full_width", full_width, 0, 1), I("display.margin", margin, 0, 12), I("display.intro", intro, 0, 1), I("control.pointer", pointer_speed, 1, 10),
     I("sound.menu", sounds, 0, 1), I("sound.volume", volume, 0, 10), I("sound.menu_music", menu_music, 0, 1),
     I("music.volume", music_volume, 0, 10),
     I("update.auto", update_auto, 0, 1), I("exit.action", exit_action, 0, 1), S("exit.dol", swiss_dol),
@@ -32,7 +32,7 @@ void settings_defaults(Settings *s) {
     s->full_width = 1;
     s->margin = 3;
     s->intro = 1;
-    s->pointer_speed = 4;
+    s->pointer_speed = 2;   /* about the old default 4, on the wider scale */
     s->sounds = 1;
     s->volume = 7;
     s->menu_music = 1;
@@ -54,6 +54,10 @@ bool settings_load(void) {
     if (!text) return false;
     char *line = text;
     bool has_action = strstr(text, "exit.action=") != NULL;
+    /* the pointer speed before the faster scale (saved as control.pointer_speed) */
+    const char *old = strstr(text, "control.pointer_speed=");
+    int old_speed = old ? atoi(old + 22) : -1;
+    bool new_speed = strstr(text, "control.pointer=") != NULL;
     while (line && *line) {
         char *next = strchr(line, '\n');
         if (next) *next++ = 0;
@@ -80,6 +84,14 @@ bool settings_load(void) {
         line = next;
     }
     free(text);
+    /* Settings from before the faster pointer scale: the old one ran from
+     * 0.48 to 1.65 (0.35 + 0.13 x the setting), the new one from 0.48 to 3.3.
+     * Pick the nearest new step, so the pointer feels the same as before. */
+    if (old_speed >= 1 && old_speed <= 10 && !new_speed) {
+        float had = 0.35f + 0.13f * old_speed;
+        int n = (int)((had - 0.48f) / ((3.3f - 0.48f) / 9.0f) + 0.5f) + 1;
+        g_set.pointer_speed = n < 1 ? 1 : n > 10 ? 10 : n;
+    }
     /* files from before the Exit choice: their default was ipl.dol */
     if (!has_action && !strcmp(g_set.swiss_dol, "sd:/ipl.dol"))
         snprintf(g_set.swiss_dol, sizeof(g_set.swiss_dol), "sd:/boot.dol");

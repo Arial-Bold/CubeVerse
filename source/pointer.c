@@ -86,8 +86,9 @@ void ptr_update(void) {
     float m = sqrtf(sx * sx + sy * sy);
     if (m > 0.05f) {
         /* gentle near the middle of the stick, fast at the edge, scaled by
-         * the Pointer speed setting (5 was the old speed; 4 the default) */
-        float k = 0.35f + 0.13f * g_set.pointer_speed;
+         * the Pointer speed setting: 1 as slow as it always was, 10 twice
+         * the old top speed, evenly spaced between */
+        float k = 0.48f + (g_set.pointer_speed - 1) * ((3.3f - 0.48f) / 9.0f);
         float target = (120 + 520 * m * m) * k;
         speed += (target - speed) * clamp01(g_dt * 10);
         px += sx / m * speed * m * g_dt;
@@ -184,5 +185,4 @@ void ptr_draw(float al) {
                 bx + (17 + grow * 1.7f) * s, by + (16 + grow * 0.6f) * s, c);
         gfx_line(bx + 7 * s, by + 15 * s, bx + 12 * s, by + 26 * s, 5 + grow * 1.8f, c);
     }
-    gfx_tri(x + 3 * s, y + 5 * s, x + 3 * s, y + 13 * s, x + 8 * s, y + 11 * s, rgba(gold.r, gold.g, gold.b, (u8)(140 * al)));
 }
