@@ -41,7 +41,7 @@ static const char *const help[SN] = {
     "Press A to see if there's a new version of CubeVerse on GitHub, and what's new in it.",
     "A quick check for a new version when CubeVerse starts (it uses the network adapter, if there is one).",
     "What B on the home cubes (and Exit now) does: start another program, or restart the console.",
-    "The program Exit starts. boot.dol is usually Swiss. Left and right choose from the .dol files on the card.",
+    "The program Exit starts. boot.dol is usually your launcher. Left and right choose from the .dol files on the card.",
     "Press A twice to leave CubeVerse now.",
 };
 

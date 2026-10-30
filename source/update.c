@@ -195,30 +195,56 @@ static void remove_tree(const char *path, int depth) {
 }
 
 /* The .dol inside the unpacked update: cubeverse.dol at the top, or any .dol. */
-static bool find_new_dol(const char *dir, char *out, size_t cap) {
-    snprintf(out, cap, "%s/cubeverse.dol", dir);
-    if (storage_is_file(out)) return true;
+/* Any .dol in dir or the folders below it (a few levels). */
+static bool find_any_dol(const char *dir, int depth, char *out, size_t cap) {
     char open_path[330];
     snprintf(open_path, sizeof(open_path), "%s/", dir);
     DIR *d = opendir(open_path);
     if (!d) return false;
     struct dirent *e;
     bool found = false;
+    char sub[8][330];
+    int nsub = 0;
     while (!found && (e = readdir(d)) != NULL) {
+        if (e->d_name[0] == '.') continue;
+        char p[330];
+        snprintf(p, sizeof(p), "%s/%s", dir, e->d_name);
         size_t n = strlen(e->d_name);
-        if (n > 4 && !strcasecmp(e->d_name + n - 4, ".dol")) {
-            snprintf(out, cap, "%s/%s", dir, e->d_name);
-            found = storage_is_file(out);
+        if (n > 4 && !strcasecmp(e->d_name + n - 4, ".dol") && storage_is_file(p)) {
+            snprintf(out, cap, "%s", p);
+            found = true;
+        } else if (depth < 3 && nsub < 8 && storage_is_dir(p)) {
+            snprintf(sub[nsub++], sizeof(sub[0]), "%s", p);
         }
     }
     closedir(d);
+    for (int i = 0; !found && i < nsub; i++) found = find_any_dol(sub[i], depth + 1, out, cap);
     return found;
 }
 
+/* The release zip holds a cubeverse folder: default.dol, opening.bnr,
+ * cacert.pem and README.txt (older releases: cubeverse.dol beside a
+ * cubeverse folder with the same extras). This is that folder in the
+ * unpacked update. */
+static void release_dir(const char *dir, char *out, size_t cap) { snprintf(out, cap, "%s/cubeverse", dir); }
+
+/* The .dol inside the unpacked update: cubeverse/default.dol, then the
+ * older cubeverse.dol, then any .dol in it. */
+static bool find_new_dol(const char *dir, char *out, size_t cap) {
+    snprintf(out, cap, "%s/cubeverse/default.dol", dir);
+    if (storage_is_file(out)) return true;
+    snprintf(out, cap, "%s/default.dol", dir);
+    if (storage_is_file(out)) return true;
+    snprintf(out, cap, "%s/cubeverse.dol", dir);
+    if (storage_is_file(out)) return true;
+    return find_any_dol(dir, 0, out, cap);
+}
+
 /* Which .dol to replace: the one we were started from, if the loader said;
- * otherwise the only cubeverse*.dol on the card. */
+ * otherwise the only cubeverse*.dol on the card, or apps/cubeverse/default.dol. */
 static bool find_target(char *out, size_t cap) {
     if (program[0]) { snprintf(out, cap, "%s", program); return true; }
+    if (storage_program_file()) { snprintf(out, cap, "%s", storage_program_file()); return true; }
     static char found[48][256];
     int n = dol_find("sd:/", found, 48), match = -1, matches = 0;
     for (int i = 0; i < n; i++) {
@@ -227,7 +253,8 @@ static bool find_target(char *out, size_t cap) {
         if (!strncasecmp(name, "cubeverse", 9) && !strstr(name, ".old") && !strstr(name, ".new")) { match = i; matches++; }
     }
     if (matches == 1) { snprintf(out, cap, "%s", found[match]); return true; }
-    return false;
+    snprintf(out, cap, "%s", APP_DIR "/default.dol");
+    return storage_is_file(out);
 }
 
 /* ------------------------------------------------------------ the worker */
@@ -384,14 +411,26 @@ static void do_install(void) {
         install_failed("Couldn't put the new version in place. The old one was kept.");
         return;
     }
-    /* the certificates and readme from the release (settings and photos are left alone) */
+    /* the certificates, readme and banner from the release (settings and
+     * the sign-in are left alone); the banner only beside a .dol in a folder of
+     * its own, never at the root of the card */
+    char rel[420];
+    release_dir(dir, rel, sizeof(rel));
     static const char *const extras[] = { "cacert.pem", "README.txt" };
     for (int i = 0; i < 2 && !bare_dol; i++) {
         char from[600], to[400], tmp[420];
-        snprintf(from, sizeof(from), "%s/cubeverse/%s", dir, extras[i]);
+        snprintf(from, sizeof(from), "%s/%s", rel, extras[i]);
         storage_path(to, sizeof(to), extras[i]);
         snprintf(tmp, sizeof(tmp), "%s.tmp", to);
         if (storage_is_file(from) && copy_file(from, tmp)) { remove(to); rename(tmp, to); }
+    }
+    char newbnr[600], bnr[340], bnrtmp[350];
+    snprintf(newbnr, sizeof(newbnr), "%s/opening.bnr", rel);
+    const char *slash = strrchr(target, '/');
+    if (!bare_dol && storage_is_file(newbnr) && slash && slash - target > 3) {   /* not "sd:/x.dol" */
+        snprintf(bnr, sizeof(bnr), "%.*s/opening.bnr", (int)(slash - target), target);
+        snprintf(bnrtmp, sizeof(bnrtmp), "%s.tmp", bnr);
+        if (copy_file(newbnr, bnrtmp)) { remove(bnr); rename(bnrtmp, bnr); }
     }
     remove(zip);
     remove_tree(dir, 0);
@@ -479,5 +518,23 @@ void update_poll(void) {
 bool update_restart(char *err, size_t errlen) {
     if (state != UPD_INSTALLED) { snprintf(err, errlen, "Nothing to restart into yet."); return false; }
     settings_save();
-    return dol_launch(target, err, errlen);
+    FILE *f = fopen(RESTART_NOTE, "wb");   /* so the new version knows where it lives (storage.c) */
+    if (f) { fputs(target, f); fclose(f); }
+    bool ok = dol_launch(target, err, errlen);
+    remove(RESTART_NOTE);                  /* only reached if it couldn't start */
+    return ok;
+}
+
+void update_remove_old(void) {
+    char p[340];
+    const char *pf = program[0] ? program : storage_program_file();
+    if (pf) {
+        snprintf(p, sizeof(p), "%s.old", pf);
+        remove(p);
+        snprintf(p, sizeof(p), "%s.new", pf);
+        remove(p);
+    }
+    static const char *const known[] = { APP_DIR "/default.dol.old", "sd:/cubeverse.dol.old" };
+    for (unsigned i = 0; i < sizeof(known) / sizeof(known[0]); i++)
+        if (storage_is_file(known[i])) remove(known[i]);
 }

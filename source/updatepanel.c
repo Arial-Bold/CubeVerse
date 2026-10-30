@@ -151,7 +151,7 @@ void update_panel_draw(void) {
                                         : st == UPD_STEP_UNPACK ? "Unpacking..." : "Putting the new version in place...");
         break;
     }
-    case UPD_INSTALLED: snprintf(head, sizeof(head), "CubeVerse %s is installed", v); snprintf(sub, sizeof(sub), "Restart CubeVerse to start using it. The old version was kept as a .old file."); break;
+    case UPD_INSTALLED: snprintf(head, sizeof(head), "CubeVerse %s is installed", v); snprintf(sub, sizeof(sub), "Restart CubeVerse to start using it. The old version is removed once the new one has started."); break;
     case UPD_FAILED: snprintf(head, sizeof(head), "The update didn't finish"); snprintf(sub, sizeof(sub), "%s", update_error()); break;
     }
     float hy = py + 42;

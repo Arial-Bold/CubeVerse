@@ -96,7 +96,12 @@ static void target_size(ImgKind k, int sw, int sh, int *dw, int *dh) {
 }
 
 /* ---- the SD card cache ---- */
-#define CACHE_DIR DATA_DIR "/cache"
+static const char *cache_dir(void) {   /* in CubeVerse's data folder */
+    static char p[320];
+    snprintf(p, sizeof(p), "%s/cache", storage_dir());
+    return p;
+}
+#define CACHE_DIR cache_dir()
 #define CACHE_MAX (48u * 1024 * 1024)
 #define CACHE_KEEP (36u * 1024 * 1024)
 #define SMALL_DAYS 3

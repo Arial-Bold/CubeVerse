@@ -1,10 +1,11 @@
 /* update.h - checks GitHub for a newer CubeVerse and installs it.
  *
  * Releases come from github.com/Arial-Bold/CubeVerse. The latest release's
- * tag (e.g. "v1.1") is compared with CV_VERSION (version.h); its .zip asset
- * holds cubeverse.dol and a cubeverse folder (README.txt, cacert.pem).
- * Installing replaces the running .dol (the old one is kept as <name>.old)
- * and cacert.pem; settings, favourites and photos are never touched.
+ * tag (e.g. "v1.1") is compared with the version (version.h); its .zip
+ * asset holds a cubeverse folder: default.dol, opening.bnr, README.txt and
+ * cacert.pem. Installing replaces the running .dol (the old one stays as
+ * <name>.old only until the new one has started), the banner and
+ * cacert.pem; settings and the sign-in are never touched.
  *
  * The network work runs on a thread of its own; everything else here is
  * called from the main thread. */
@@ -43,3 +44,6 @@ void update_request_install(void);
 void update_cancel(void);
 void update_poll(void);                       /* once per frame */
 bool update_restart(char *err, size_t errlen);   /* starts the newly installed .dol */
+/* At start: deletes the previous version left by an update (<name>.old), now
+ * that this one has started, so old versions don't pile up on the card. */
+void update_remove_old(void);

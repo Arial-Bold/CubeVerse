@@ -125,7 +125,7 @@ const char *app_exit_label(void) {
     const char *name = strrchr(g_set.swiss_dol, '/');
     name = name ? name + 1 : g_set.swiss_dol;
     if (!strncasecmp(name, "swiss", 5) || !strcasecmp(name, "boot.dol") || !strcasecmp(name, "ipl.dol") || !name[0])
-        return "Exit to Swiss";
+        return "Exit to Launcher";
     snprintf(buf, sizeof(buf), "Exit to %.40s", name);
     char *dot = strrchr(buf, '.');
     if (dot && !strcasecmp(dot, ".dol")) *dot = 0;
@@ -263,8 +263,10 @@ void app_frame(void) {
 
 #ifndef PC_TEST
 int main(int argc, char **argv) {
+    storage_set_program(argc > 0 ? argv[0] : NULL);
     app_init();
-    update_set_program(argc > 0 ? argv[0] : NULL);
+    update_set_program(storage_program_file());      /* the .dol an update replaces */
+    if (storage_ok()) update_remove_old();           /* this version started: the one it replaced can go */
     for (;;) app_frame();
     return 0;
 }
